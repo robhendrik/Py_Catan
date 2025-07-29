@@ -1,0 +1,86 @@
+from Py_Catan.Preferences import PlayerPreferences
+from Py_Catan.BoardStructure import BoardStructure
+from Py_Catan.Player import Player
+from Py_Catan.Board import Board
+from Py_Catan.BoardVector import BoardVector
+import numpy as np
+
+class ValueFunction:
+    def __init__(self, preference: PlayerPreferences, structure: BoardStructure):
+        self.preference = preference
+        self.structure = structure
+        return
+    
+    def value_for_board(self, board = Board) -> np.ndarray:
+        board._update_board_for_players()
+        values = []
+        for player in board.players:
+            player.update_build_options()
+            values.append(self.value_for_player(player))
+        return np.array(values,np.float32)
+    
+    def value_for_board_vector(self, board_vector: BoardVector) -> np.ndarray:
+        board = board_vector.create_board_from_vector()
+        return self.value_for_board(board)
+    
+    def value_from_vector(self, vector: np.ndarray) -> np.ndarray:
+        board = Board(structure=self.structure)
+        board_vector = BoardVector(board=board)
+        board_vector.vector = vector
+        return self.value_for_board_vector(board_vector)
+    
+    def value_for_player(self, player: Player) -> float:
+        value = 0.0
+        # calculate score
+        score = 0
+        score += sum(player.towns) * 2
+        score += sum(player.villages) * 1
+        score += 2 if  player.owns_longest_street else 0
+        value += self.preference.full_score if score==self.structure.winning_score else 0
+        
+        # value of direct posessions
+        value += np.sum(player.streets) * self.preference.streets
+        value += np.sum(player.villages) * self.preference.villages
+        value += np.sum(player.towns) * self.preference.towns
+        
+        # value of cards in hand and penalty for too many cards
+        penalty_factor = (sum(player.hand)/(sum(player.hand)+self.preference.penalty_reference_for_too_many_cards) )
+        value += penalty_factor * np.inner(player.hand,self.preference.resource_type_weight) * self.preference.cards_in_hand
+
+        # value of current earning power
+        earning_power = np.sum(self.structure.node_earning_power[player.villages == 1],axis=0) + 2*np.sum(self.structure.node_earning_power[player.towns == 1],axis=0)
+        value += np.dot(earning_power ,self.preference.resource_type_weight) * self.preference.cards_earning_power
+
+        # value of direct options
+        value += np.all(player.hand >= self.structure.real_estate_cost[0]) * self.preference.hand_for_street
+        value += np.all(player.hand >= self.structure.real_estate_cost[1]) * self.preference.hand_for_village
+        value += np.all(player.hand >= self.structure.real_estate_cost[2]) * self.preference.hand_for_town
+        value += np.sum(player.build_options['street_options']) * self.preference.street_build_options
+        value += np.sum(player.build_options['village_options']) * self.preference.village_build_options
+
+        # value of earning power for direct options
+        extra_villages=player.build_options['village_options']
+        secondary_earning_power =  np.sum(self.structure.node_earning_power[extra_villages == 1],axis=0)
+        value += np.dot(secondary_earning_power ,self.preference.resource_type_weight) * self.preference.direct_options_earning_power
+        
+        # value of secondary options
+        helper = (player.hand - np.array(self.structure.real_estate_cost[0]))
+        value += (1 if -2 == np.sum(helper[helper < 0]) else 0) * self.preference.hand_for_street_missing_one
+        helper = (player.hand - np.array(self.structure.real_estate_cost[1]))
+        value += (1 if -2 == np.sum(helper[helper < 0]) else 0)  * self.preference.hand_for_village_missing_one
+        helper = (player.hand - np.array(self.structure.real_estate_cost[2]))
+        value += (1 if -2 == np.sum(helper[helper < 0]) else 0)  * self.preference.hand_for_town_missing_one
+        value += np.sum(player.build_options['secondary_village_options']) * self.preference.secondary_village_build_options
+    
+        # value of secondary options earning power
+        extra_villages=player.build_options['secondary_village_options']
+        secondary_earning_power =  np.sum(self.structure.node_earning_power[extra_villages == 1],axis=0)
+        value += np.dot(secondary_earning_power ,self.preference.resource_type_weight) * self.preference.secondary_options_earning_power
+
+        # value of tertiary options
+        helper = (player.hand - np.array(self.structure.real_estate_cost[1]))
+        value += (1 if -2 == np.sum(helper[helper < 0]) else 0) * self.preference.hand_for_village_missing_two
+        helper = (player.hand - np.array(self.structure.real_estate_cost[2]))
+        value += (1 if -2 == np.sum(helper[helper < 0]) else 0)  * self.preference.hand_for_town_missing_two
+        
+        return value

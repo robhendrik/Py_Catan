@@ -1,0 +1,9 @@
+/.pytest_cache
+/.vscode
+/game_logging_20.txt
+/test_game_logging.txt
+/training_data
+/trained_models
+/notebooks
+/docs
+/venvs
