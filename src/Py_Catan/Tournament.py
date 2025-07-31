@@ -181,20 +181,21 @@ class Tournament:
         for p in board.players}
         return d
     
-    def play_game(self,board_structure: BoardStructure,players: list, draw_board: bool =False)->tuple:
+    def play_game(self,board_structure: BoardStructure,players: list, draw_board: bool =False, print_actions: bool = False)->tuple:
         '''
         Play a game with the given board structure and players.
         Returns the scores of the players and the rounds played
         '''
         brd = Board(structure = board_structure,players=players)
+        brd._print_player_action = print_actions
         brd._update_board_for_players()
         # Set up the board
+        round = 0
         self.setup_board(brd)
         if draw_board:
             draw = PlotCatanBoard(board = brd)
             draw.plot_board_positions()   
         # Play rounds until one player reaches the winning score or the maximum number of rounds is reached
-        round = 0
         while all([p.calculate_score() < brd.structure.winning_score for p in brd.players]) and (round<=self.max_rounds_per_game):
             self.play_round(brd, round)
             round += 1
@@ -205,14 +206,25 @@ class Tournament:
 
         return ([p.calculate_score() for p in brd.players],[round]*len(brd.players))
 
-    def setup_board(self,brd):
+    def setup_board(self,brd, round: int = 0):
         '''    
         Setup the board with players and initial buildings.
         '''
-        for p in brd.players + brd.players[::-1]:
+        for (position,p) in enumerate(brd.players):
             actions = p.player_setup(brd)
             brd.execute_player_action(p, actions[0])
             brd.execute_player_action(p, actions[1])
+            if self.logging:
+                self.game_records.update({(round,position):brd.create_board_vector()})
+        round += 1
+        for p in brd.players[::-1]:
+            actions = p.player_setup(brd)
+            brd.execute_player_action(p, actions[0])
+            brd.execute_player_action(p, actions[1])
+            if self.logging:
+                position = brd.players.index(p)
+                self.game_records.update({(round,position):brd.create_board_vector()})
+        round += 1
         return
 
     def play_round(self,brd, round: int = 0):

@@ -64,6 +64,7 @@ class Board:
         
         self.free_nodes_on_board = self.free_nodes()
         self.free_edges_on_board = self.free_edges()
+        self._print_player_action = False  # Set to True to print player actions for debugging
 
     def free_nodes(self) -> np.ndarray  :
         '''
@@ -288,6 +289,8 @@ class Board:
         If the action is not valid, it is ignored.
         The method updates the board and the player state accordingly.
         '''
+        if self._print_player_action == True:
+            print(f"Player {player.name} executing action: {best_action}")
         if best_action[0] == 'street':
             self.build_street(player=player,edge=best_action[1])
         elif best_action[0] == 'village':
@@ -298,12 +301,16 @@ class Board:
             response = self.propose_and_execute_trade(player = player, card_out_in = best_action[1])
             if response == False:
                 rejected_trades_for_this_round.add(best_action[1])
+                if self._print_player_action == True:
+                    print(f"Trade {best_action[1]} rejected for player {player.name}.")
         elif best_action[0] == 'trade_specific_player':
             response = self.propose_and_execute_trade(player = player, 
                                            card_out_in = best_action[1][0], 
                                            specified_trading_partner = best_action[1][1])
             if response == False:
                 rejected_trades_for_this_round_for_specific_player.add(best_action[1])
+                if self._print_player_action == True:
+                    print(f"Trade {best_action[1]} rejected for player {player.name}.")
         elif best_action[0] == 'trade_bank':
             self.trade_with_bank(player = player, card_out_in = best_action[1])
         else:

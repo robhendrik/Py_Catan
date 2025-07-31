@@ -162,3 +162,16 @@ d = {'full_score': 500.0, 'streets': 0.16230640903319835, 'villages': 0.27175062
      'resource_type_weight': np.array([0.25912856, 0.        , 0.14324592, 0.24272492, 0.14724166,
        0.20765893])}
 optimized_2 = PlayerPreferences(**d).normalized()
+
+d={'full_score': 0, 'streets': 0.1615594227747923, 'villages': 0.2961485945875825, 'towns': 0.24153440764240208, 
+   'penalty_reference_for_too_many_cards': 7, 'cards_in_hand': 0.0013711796157184063, 
+   'hand_for_street': 0.023639163335292715, 'hand_for_village': 0.03128547202248002, 
+   'hand_for_town': 0.025491342005668043, 'street_build_options': 0.11401320207729074, 
+   'village_build_options': 0.0014075613236915708, 'cards_earning_power': 0.05033539418219382, 
+   'hand_for_street_missing_one': 0.002443204306152173, 'hand_for_village_missing_one': 0.002042238708140502, 
+   'hand_for_town_missing_one': 0.0017278376628582053, 'secondary_village_build_options': 0.0, 
+   'direct_options_earning_power': 0.026728644648182663, 'hand_for_village_missing_two': 0.0014441706982328611, 
+   'hand_for_town_missing_two': 0.0036821948583871038, 'secondary_options_earning_power': 0.015145969550934273, 
+   'resource_type_weight': np.array([0.27126462, 0.        , 0.13846242, 0.25696639, 0.15221156,
+       0.18109501])}
+optimized_1_with_0_for_full_score = PlayerPreferences(**d).normalized()

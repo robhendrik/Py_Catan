@@ -5,6 +5,7 @@ import pytest
 import numpy as np
 
 from Py_Catan.BoardStructure import BoardStructure, BoardLayout
+from Py_Catan.Tournament import Tournament
 from Py_Catan.PlotBoard import PlotCatanBoard
 from Py_Catan.Preferences import PlayerPreferences
 from Py_Catan.Player import Player
@@ -13,8 +14,9 @@ from Py_Catan.PlayerValueFunctionBased import Player_Value_Function_Based
 from Py_Catan.PlayerModelBased import Player_Model_Based
 from keras.models import Model
 from keras.saving import load_model
+from Py_Catan.Player_Model_Types import model_trained_on_streets_villages_towns_b_cards, model_trained_on_specific_villages_and_streets
 
-test_model_path = './tests/test_models/test_model_wth_jul_27_dataset.keras'
+#test_model_path = './tests/test_models/test_model_wth_jul_27_dataset.keras'
 
 def test_respond_to_trading_request():
     """
@@ -22,7 +24,7 @@ def test_respond_to_trading_request():
     """
     board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
     structure = BoardStructure(board_layout=board_layout)
-    model = load_model(test_model_path, safe_mode=False)
+    model = model_trained_on_streets_villages_towns_b_cards().get_model()
     p = Player_Model_Based(name='Player_5', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[3] = p
@@ -39,7 +41,7 @@ def test_generate_list_of_possible_actions():
     # Setup: create a board and player
     board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
     structure = BoardStructure(board_layout=board_layout)
-    model = load_model(test_model_path, safe_mode=False)
+    model = model_trained_on_streets_villages_towns_b_cards().get_model()
     player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[3] = player
@@ -98,7 +100,7 @@ def test_generate_list_of_values():
     # Setup: create a board and player
     board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
     structure = BoardStructure(board_layout=board_layout)
-    model = load_model(test_model_path, safe_mode=False)
+    model = model_trained_on_streets_villages_towns_b_cards().get_model()
     player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[3] = player
@@ -135,7 +137,7 @@ def test_best_action_for_fourth_player_who_likes_B_cards():
     # Setup: create a board and player
     board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
     structure = BoardStructure(board_layout=board_layout)
-    model = load_model(test_model_path, safe_mode=False)
+    model = model_trained_on_streets_villages_towns_b_cards().get_model()
     player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[3] = player # this players likes B -cards
@@ -179,7 +181,7 @@ def test_best_action_for_first_player_who_likes_streets():
     # Setup: create a board and player
     board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
     structure = BoardStructure(board_layout=board_layout)
-    model = load_model(test_model_path, safe_mode=False)
+    model = model_trained_on_streets_villages_towns_b_cards().get_model()
     player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[0] = player # this players likes streets
@@ -228,7 +230,7 @@ def test_best_action_for_second_player_who_likes_villages():
     # Setup: create a board and player
     board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
     structure = BoardStructure(board_layout=board_layout)
-    model = load_model(test_model_path, safe_mode=False)
+    model = model_trained_on_streets_villages_towns_b_cards().get_model()
     player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[1] = player # this players likes villages
@@ -279,7 +281,7 @@ def test_best_action_for_third_player_who_likes_towns():
     # Setup: create a board and player
     board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
     structure = BoardStructure(board_layout=board_layout)
-    model = load_model(test_model_path, safe_mode=False)
+    model = model_trained_on_streets_villages_towns_b_cards().get_model()
     player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[2] = player # this players likes towns
@@ -320,3 +322,100 @@ def test_best_action_for_third_player_who_likes_towns():
     best_action = player.find_best_action(rejected_trades_for_this_round=dict([]))
     assert len(values) == len(actions)
     assert best_action[0] == 'town'
+
+def test_best_action_in_set_up_for_player_who_likes_specific_villages_and_streets():
+    """
+    test if a model based player with preference for specific villages and streets indeed builds them
+    """
+
+    # Setup: create a board and player
+    board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
+    structure = BoardStructure(board_layout=board_layout)
+    model = model_trained_on_specific_villages_and_streets().get_model()
+    player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
+    brd = Board(structure=structure)
+    brd.players[0] = player # this players likes village and street 0
+    brd._update_board_for_players()
+    player.update_build_options()
+    player.hand = np.array([0, 0, 0, 0, 0, 0])  # empty hand
+    actions = player.player_setup(brd)
+    assert len(actions) == 2
+    assert actions[0][0] == 'village'
+    assert actions[0][1] == 0  # village on node 0
+    assert actions[1][0] == 'street'
+    assert actions[1][1] == 0  # street on edge 0
+
+    # Setup: create a board and player
+    board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
+    structure = BoardStructure(board_layout=board_layout)
+    model = model_trained_on_specific_villages_and_streets().get_model()
+    player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
+    brd = Board(structure=structure)
+    brd.players[2] = player # this players likes village 20 and street 25
+    brd._update_board_for_players()
+    player.update_build_options()
+    player.hand = np.array([0, 0, 0, 0, 0, 0])  # empty hand
+    actions = player.player_setup(brd)
+    assert len(actions) == 2
+    assert actions[0][0] == 'village'
+    assert actions[0][1] == 20  # village on node 20
+    assert actions[1][0] == 'street'
+    assert actions[1][1] == 25  # street on edge 25
+
+def test_best_action_in_turn_for_player_who_likes_specific_villages_and_streets():
+    """
+    test if a model based player with preference for specific villages and streets indeed builds them
+    """
+
+    # Setup: create a board and player
+    board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
+    structure = BoardStructure(board_layout=board_layout)
+    model = model_trained_on_specific_villages_and_streets().get_model()
+    player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
+    brd = Board(structure=structure)
+    brd.players[0] = player # this players likes village and street 
+
+    player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
+    brd.players[1] = player # this players likes village and street 
+
+    player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
+    brd.players[2] = player # this players likes village and street 
+
+    player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
+    brd.players[3] = player # this players likes village and street 
+
+    brd.execute_player_action(brd.players[0], ('village',0))
+    brd.execute_player_action(brd.players[0], ('street', 5))
+    brd.execute_player_action(brd.players[0], ('street', 11))
+    brd.execute_player_action(brd.players[1], ('street', 16))
+    brd.execute_player_action(brd.players[1], ('street', 17))
+    brd.execute_player_action(brd.players[1], ('street', 18))
+    brd.execute_player_action(brd.players[2], ('village',20))
+    brd.execute_player_action(brd.players[2], ('street', 26))
+    brd.execute_player_action(brd.players[2], ('street', 40))
+    brd.execute_player_action(brd.players[3], ('street', 46))
+    brd.execute_player_action(brd.players[3], ('street', 47))
+    brd.execute_player_action(brd.players[3], ('street', 48))
+
+    for player in brd.players:
+        player.hand = np.array(structure.real_estate_cost[1])  # village, can also build street
+    brd._update_board_for_players()
+    for player in brd.players:
+        player.update_build_options()
+
+    best_action = brd.players[0].find_best_action(rejected_trades_for_this_round=dict([]))
+    assert best_action[0]  == 'street'
+    assert best_action[1]  == 0
+    
+    best_action = brd.players[1].find_best_action(rejected_trades_for_this_round=dict([]))
+    assert best_action[0]  == 'village'
+    assert best_action[1]  == 10
+
+    best_action = brd.players[2].find_best_action(rejected_trades_for_this_round=dict([]))
+    assert best_action[0]  == 'street'
+    assert best_action[1]  == 25
+
+    best_action = brd.players[3].find_best_action(rejected_trades_for_this_round=dict([]))
+    assert best_action[0]  == 'village'
+    assert best_action[1]  == 30
+    
