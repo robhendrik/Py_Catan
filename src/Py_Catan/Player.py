@@ -3,12 +3,13 @@ from Py_Catan.BoardStructure import BoardStructure
 import numpy as np
 import random
 from functools import cache
+import warnings
 
 class Player:
     def __init__(self,
                  name: str = 'A', 
                  structure: BoardStructure = BoardStructure(),
-                 preference: any = PlayerPreferences(), 
+                 preference: any = None, 
                  status: dict = dict([]) ):
         """
         Create a new instance of a player. This is the parent class, players with specific behavior
@@ -29,7 +30,9 @@ class Player:
         if not status:
             # attributes at instance creation
             self.name = name
-            self.preference = preference
+            if preference is not None:
+                warnings.warn("Preference is not used in the base Player class, it is used in child classes. This attribute will be removed.", DeprecationWarning)
+                self.preference = preference
             self.structure = structure
 
             # board properties, changing during game
@@ -89,8 +92,14 @@ class Player:
                     np[k] = v
         return new_player
     
-    def copy_position_from_other_player(self,other_player) -> 'Player':
-        """Copy the position of other player to self"""
+    def copy_position_from_other_player(self,other_player) -> None:
+        """
+        Copy the position of other player to self. 
+        
+        This copies the hand, streets, villages, towns, longest street and other attributes from another player to this
+        player without creating a new instance. Specifically player preferences and dedicated attributes from child class are 
+        not copied.
+        """
         self.hand = other_player.hand.copy()
         self.streets = other_player.streets.copy()
         self.towns = other_player.towns.copy()
@@ -139,7 +148,7 @@ class Player:
         possible_actions = self.generate_list_of_possible_actions(rejected_trades=rejected_trades_for_this_round)
         if possible_actions:
             # player behavior is based on how value is calculated
-            values = self.generate_values_for_options(possible_actions)[..., self._player_position]
+            values = self.generate_values_for_possible_actions(possible_actions)[..., self._player_position]
             # in this case 'algorithm' is to select the action with the highest value, could be different.
             best_index = np.argmax(values)
         if not possible_actions or values[best_index] <= initial_value:
@@ -693,7 +702,7 @@ class Player:
         return possible_actions
     
  
-    def generate_values_for_options(self, list_of_options):
+    def generate_values_for_possible_actions(self, list_of_options):
         """
         Generate values for a list of options. The values are returned as a list of lists, where each inner list
         contains the values for each player in the game after executing the action.
@@ -706,6 +715,14 @@ class Player:
         [value player 1, value player 2, ...] # for second action in list of options,
         ...
         ]
+
+        The action types are:
+        - 'street': build a street on the given edge
+        - 'village': build a village on the given node
+        - 'town': build a town on the given node
+        - 'trade_player': trade with another player
+        - 'trade_specific_player': trade with a specific player
+        - 'trade_bank': trade with the bank
 
         Args:
             list_of_options (tuple): list of actions to evaluate, e.g. [('street',1),('village',2),('trade_player',(1,0))]
@@ -727,6 +744,13 @@ class Player:
             new_board.execute_player_action(new_player, action, enforce_trade=True)
             values.append([p.calculate_value() for p in new_board.players])
         return np.array(values)
+    
+    def generate_values_for_options(self, list_of_options):
+        """
+        Refers to generate_values_for_possible_actions
+        """
+        warnings.warn("This function is deprecated, use generate_values_for_possible_actions() instead", DeprecationWarning)
+        return self.generate_values_for_possible_actions(list_of_options)
 
     def random_action(self,
                          rejected_trades_for_this_round: set = set([]),

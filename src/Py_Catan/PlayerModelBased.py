@@ -4,6 +4,7 @@ from Py_Catan.Player import Player
 from Py_Catan.BoardVector import BoardVector
 import numpy as np
 from keras.models import Model
+import warnings
 
 class Player_Model_Based(Player):
     def __init__(self,
@@ -51,142 +52,30 @@ class Player_Model_Based(Player):
         current_value = self.calculate_value((None,None))
         new_value = self.calculate_value(('trade_player', card_out_in))
         return (new_value > current_value) and not np.isclose(new_value,current_value, atol=self.atol)
-   
-    # def generate_possible_actions_for_trading_with_other_player(self,                                                        
-    #                                                             rejected_trades: set = None,
-    #                                                             card_out_in: tuple = None
-    #                                                             ) -> list:
-        
-    #     if not card_out_in:
-    #         swaps_to_explore =   [
-    #             (card_out,card_in) for card_out in range(len(self.hand))
-    #                 for card_in in range(len(self.hand)) if 
-    #                 (card_out != card_in and self.hand[card_out] > 0 and (card_out,card_in) not in rejected_trades)
-    #                 ]
-    #     else:
-    #         swaps_to_explore = [(card_out_in[0],card_out_in[1])]
-    #     results = []
-    #     for card_out,card_in in swaps_to_explore:
-    #         action = ('trade_player',(card_out,card_in))
-    #         results.append(action)
-    #     return results
-    
-    # def generate_possible_actions_for_trading_with_specific_player(self,
-    #                                                             rejected_trades_for_specific_player: set = None,
-    #                                                             card_out_in: tuple = None
-    #                                                             ) -> list:
-    #     """
-    #     Generate possible actions for trading with a specific player.
-    #     This is a placeholder method and should be implemented in subclasses.
-    #     """
-    #     results = []
-    #     # This method should be overridden to implement specific trading logic]
-    #     # results should be a list of tuples [((card_out, card_in), trading_partner), ...]
-    #     return results
 
-    # def generate_possible_actions_for_trading_with_bank(self,
-    #                                                     card_out_in: tuple = None
-    #                                                     ) -> list:
-    #     if not card_out_in:
-    #         swaps_to_explore =   [(card_out,card_in) for card_out in range(len(self.hand))
-    #                 for card_in in range(len(self.hand)) if (card_out != card_in and self.hand[card_out] >= 4)]
-    #     else:
-    #         swaps_to_explore = [(card_out_in[0],card_out_in[1])]
-    #     results = []
-    #     for card_out,card_in in swaps_to_explore:
-    #         action = ('trade_bank',(card_out,card_in))
-    #         results.append(action)
-    #     return results
-
-    # def generate_possible_actions_for_building_street(self,
-    #                                                   edge: tuple = None, 
-    #                                                   set_up: bool = False, 
-    #                                                   set_up_node: int = None
-    #                                                   ) -> list:
-    #     if not set_up:
-    #         if not edge:
-    #             edges_to_explore = np.nonzero(self.build_options['street_options'])[0]
-    #         else:
-    #             edges_to_explore = [edge]
-    #     else:
-    #         edges_to_explore = [edge for edge,connecting_nodes in enumerate(self.structure.nodes_connected_by_edge) if set_up_node in connecting_nodes]
-    #     results = []
-    #     for edge in edges_to_explore:
-    #         action = ('street',edge)
-    #         results.append(action)
-    #     return results
+    def generate_values_for_options(self, list_of_options):
+        """
+        Refers to generate_values_for_possible_actions
+        """
+        warnings.warn("This function is deprecated, use generate_values_for_possible_actions() instead", DeprecationWarning)
+        return self.generate_values_for_possible_actions(list_of_options)
     
-    # def generate_possible_actions_for_building_village(self, 
-    #                                                    node: int = None, 
-    #                                                    set_up: bool = False
-    #                                                    ) -> list:
-    #     if not set_up:
-    #         if not node:
-    #             nodes_to_explore = np.nonzero(self.build_options['village_options'])[0]
-    #         else:
-    #             nodes_to_explore = [node]
-    #     else:
-    #         nodes_to_explore = np.nonzero(self.free_nodes_on_board)[0]
-       
-    #     results = []
-    #     for node in nodes_to_explore:
-    #         action = ('village',node)
-    #         results.append(action)
-    #     return results
-    
-    # def generate_possible_actions_for_building_town(self, 
-    #                                                 node:int = None
-    #                                                 ) -> list:
-    #     if not node:
-    #         nodes_to_explore = np.nonzero(self.villages)[0]
-    #     else:
-    #         nodes_to_explore = [node]
-    #     results = []
-    #     for node in nodes_to_explore:
-    #         action = ('town',node)
-    #         results.append(action)
-    #     return results
-    
-    # def generate_list_of_possible_actions(self,
-    #                                         rejected_trades: set = None,
-    #                                         rejected_trades_for_specific_player: set = None
-    #                                         ) -> list:
-    #     '''
-    #     Generate a list of all possible actions for the player.
-    #     The actions are given as a list of tuples, where the first element is the action type
-    #     and the second element is the action parameters.
-    #     The action types are:
-    #     - 'street': build a street on the given edge 
-    #     - 'village': build a village on the given node
-    #     - 'town': build a town on the given node
-    #     - 'trade_player': trade with another player
-    #     - 'trade_specific_player': trade with a specific player
-    #     - 'trade_bank': trade with the bank
-    #     '''
-    #     possible_actions = []
-    #     if self.can_build_street():
-    #         possible_actions += self.generate_possible_actions_for_building_street()
-    #     if self.can_build_village():
-    #         possible_actions += self.generate_possible_actions_for_building_village()
-    #     if self.can_build_town():
-    #         possible_actions += self.generate_possible_actions_for_building_town()
-    #     if self.can_trade_with_player():
-    #         possible_actions += self.generate_possible_actions_for_trading_with_other_player(rejected_trades=rejected_trades)
-    #     if self.can_trade_with_bank():
-    #         possible_actions += self.generate_possible_actions_for_trading_with_bank()
-    #     if self.can_trade_with_specific_player():
-    #         possible_actions += self.generate_possible_actions_for_trading_with_specific_player(
-    #             rejected_trades_for_specific_player=rejected_trades_for_specific_player
-    #             )
-    #     return possible_actions
-
     def generate_values_for_possible_actions(self,
                                              possible_actions: list
                                              ) -> list:
-        '''
-        Generate values for all possible actions.
-        The actions are given as a list of tuples, where the first element is the action type
-        and the second element is the action parameters.
+        """
+        Generate values for a list of options. The values are returned as a list of lists, where each inner list
+        contains the values for each player in the game after executing the action.
+
+        NOTE: For the action trade player the trade is enforced with next player, so the generated value only exactly matches
+        if the next player accepts the trade.
+
+        [
+        [value player 1, value player 2, ...] # for first action in list of options,
+        [value player 1, value player 2, ...] # for second action in list of options,
+        ...
+        ]
+
         The action types are:
         - 'street': build a street on the given edge
         - 'village': build a village on the given node
@@ -194,7 +83,13 @@ class Player_Model_Based(Player):
         - 'trade_player': trade with another player
         - 'trade_specific_player': trade with a specific player
         - 'trade_bank': trade with the bank
-        '''
+
+        Args:
+            list_of_options (tuple): list of actions to evaluate, e.g. [('street',1),('village',2),('trade_player',(1,0))]
+
+        Returns:
+            list: A list of lists containing the values for each player in the game after executing the action.
+        """
         if not possible_actions:
             raise Exception('No possible actions to evaluate')
         initial_vector = BoardVector(board=self._board, include_values = False)

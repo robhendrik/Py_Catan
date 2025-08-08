@@ -268,9 +268,10 @@ def test_trade_between_players():
     g.players[1] = q
     p.hand = np.array([1,0,1,1,1,1])
     q.hand = np.array([0,0,0,0,0,0])
-    g._update_board_for_players()
-    p.update_build_options()
-    q.update_build_options()
+    g.sync_status_between_board_and_players()
+    # g._update_board_for_players()
+    # p.update_build_options()
+    # q.update_build_options()
     rejected_trades = set([])
     for _ in range(2):
         options = p.explore_trading_with_other_player(rejected_trades=rejected_trades)
@@ -290,9 +291,10 @@ def test_trade_between_players():
     pref.resource_type_weight= np.array([0,0,0,0,0,1])
     q = Player_Value_Function_Based(preference=pref.normalized())
     g.players = [p,q]
-    g._update_board_for_players()
-    p.update_build_options()
-    q.update_build_options()
+    # g._update_board_for_players()
+    # p.update_build_options()
+    # q.update_build_options()
+    g.sync_status_between_board_and_players()
     p.hand = np.array([1,0,1,1,1,1])
     q.hand = np.array([1,0,1,1,1,1])
     rejected_trades = set([])

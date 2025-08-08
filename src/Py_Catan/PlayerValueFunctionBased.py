@@ -3,6 +3,7 @@ from Py_Catan.BoardStructure import BoardStructure
 from Py_Catan.Player import Player
 from Py_Catan.ValueFunction import ValueFunction
 import numpy as np
+import warnings
 
 class Player_Value_Function_Based(Player):
     def __init__(self,
@@ -14,10 +15,11 @@ class Player_Value_Function_Based(Player):
         super().__init__(
                 name = name, 
                 structure = structure,
-                preference = preference, 
+                #preference = preference, 
                 status = status,           
                 )
         self.value_function = ValueFunction(preference, structure)
+        self.preference = preference
         return 
     
     def copy(self) -> 'Player_Value_Function_Based':
@@ -48,11 +50,8 @@ class Player_Value_Function_Based(Player):
         if self.hand[card_out_in[0]] <= 0:
             return False
         current_value = self.calculate_value()
-        temp_player = self.copy()
-        temp_player.hand[card_out_in[0]] -= 1
-        temp_player.hand[card_out_in[1]] += 1
-        new_value = temp_player.calculate_value()
-        del temp_player
+        action = ('trade_player', card_out_in)
+        new_value = self.generate_values_for_possible_actions([action])[..., self._player_position]
         return (new_value > current_value) and not np.isclose(new_value,current_value, atol=self.atol)
     
     def find_best_action(self, 
@@ -69,7 +68,7 @@ class Player_Value_Function_Based(Player):
         initial_value = self.calculate_value()
         possible_actions = self.generate_list_of_possible_actions(rejected_trades=rejected_trades_for_this_round)
         if possible_actions:
-            values = self.generate_values_for_options(possible_actions)[..., self._player_position]
+            values = self.generate_values_for_possible_actions(possible_actions)[..., self._player_position]
             best_index = np.argmax(values)
         if not possible_actions or values[best_index] <= initial_value:
             best_action = (None, None)  # No action is better than the current state
@@ -89,7 +88,7 @@ class Player_Value_Function_Based(Player):
         options = self.generate_possible_actions_for_building_village(set_up=True)
         if not options:
             raise Exception('No options for building village during setup')
-        values = self.generate_values_for_options(options)[..., self._player_position]
+        values = self.generate_values_for_possible_actions(options)[..., self._player_position]
         best_index = np.argmax(values)
         best_node = options[best_index][1]
         self.update_build_options()
@@ -97,11 +96,34 @@ class Player_Value_Function_Based(Player):
         options = self.generate_possible_actions_for_building_street(set_up=True, set_up_node=best_node)
         if not options:
             raise Exception('No options for building street during setup')
-        values = self.generate_values_for_options(options)[..., self._player_position]
+        values = self.generate_values_for_possible_actions(options)[..., self._player_position]
         best_index = np.argmax(values)
         best_edge = options[best_index][1]
         return [('village', best_node),('street',best_edge)]
     
+    def calculate_value(self):
+        """ This function now refers to Py_Catan.ValueFunction.value_for_player()"""
+        return self.value_function.value_for_player(self)
+    
+
+
+    
+    # ============================================================================================================
+    #
+    # The following functions are deprecated and will be removed in the future.
+    #
+    # =============================================================================================================
+    def player_setup_old_method(self, brd) -> list:
+        """
+        Setup the player with initial buildings. Which streets and villages are built is based on the preferences.
+
+        Args:
+            brd (_type_): _description_
+
+        Returns:
+            list: _description_
+        """
+        warnings.warn("This function is deprecated.", UserWarning)
         # self.update_build_options()
         # self.hand = np.array(brd.structure.real_estate_cost[1])
         # options = self.explore_building_village(set_up=True)
@@ -111,6 +133,8 @@ class Player_Value_Function_Based(Player):
         # options = self.explore_building_street(set_up=True, set_up_node=best_node)
         # best_edge = options[0][1]
         # return [('village', best_node),('street',best_edge)]
+
+
     
     def explore_trading_with_specific_player(self,
                                               rejected_trades: set = None,
@@ -131,6 +155,7 @@ class Player_Value_Function_Based(Player):
             list[tuple]: A list of tuples with the action and the cards to trade, 
             ordered by the most optimal trade first, ( value, ((card_out, card_in),trading_partner)) 
         """
+        warnings.warn("This function is not yet implemented. It will return an empty list.", UserWarning)
         results = []
         # results will be a list of tuples [( value, ((card_out, card_in),trading_partner)) ), ...]
         return results
@@ -151,6 +176,7 @@ class Player_Value_Function_Based(Player):
         Returns:
             list[tuple]: A list of tuples with the action and the cards to trade, ordered by the most optimal trade first.
         """
+        warnings.warn("This function is deprecated.", UserWarning)
         # if not card_out_in:
         #     swaps_to_explore =   [
         #         (card_out,card_in) for card_out in range(len(self.hand))
@@ -190,6 +216,7 @@ class Player_Value_Function_Based(Player):
         Returns:
             list[tuple]: A list of tuples with the action and the cards to trade, ordered by the most optimal trade first.
         """
+        warnings.warn("This function is deprecated.", UserWarning)
         # if not card_out_in:
         #     swaps_to_explore =   [(card_out,card_in) for card_out in range(len(self.hand))
         #             for card_in in range(len(self.hand)) if (card_out != card_in and self.hand[card_out] >= 4)]
@@ -228,6 +255,7 @@ class Player_Value_Function_Based(Player):
         Returns:
             list[tuple]: A list of tuples with the value and the edge to build on.
         """
+        warnings.warn("This function is deprecated.", UserWarning)
         # if not set_up:
         #     if not edge:
         #         edges_to_explore = np.nonzero(self.build_options['street_options'])[0]
@@ -266,6 +294,7 @@ class Player_Value_Function_Based(Player):
         Returns:
             list[tuple]: A list of tuples with the value and the node to build on.
         """
+        warnings.warn("This function is deprecated.", UserWarning)
         # if not set_up:
         #     if not node:
         #         nodes_to_explore = np.nonzero(self.build_options['village_options'])[0]
@@ -305,6 +334,7 @@ class Player_Value_Function_Based(Player):
         Returns:
             list[tuple]: A list of tuples with the value and the node to build on.
         """
+        warnings.warn("This function is deprecated.", UserWarning)
         # if not node:
         #     nodes_to_explore = np.nonzero(self.villages)[0]
         # else:
@@ -329,7 +359,7 @@ class Player_Value_Function_Based(Player):
    
     def calculate_value_hand(self, hand_for_calculation: np.ndarray = None):
         """ Legacy, this function now refers to Py_Catan.ValueFunction.value_from_players_hand()"""
-
+        warnings.warn("This function is deprecated.", UserWarning)
         if hand_for_calculation is None:
             hand_for_calculation = self.hand
         return self.value_function.value_from_players_hand(hand_for_calculation)
@@ -340,6 +370,7 @@ class Player_Value_Function_Based(Player):
                                     towns_for_calculation
                                     ):
         """ Legacy, this function now refers to Py_Catan.ValueFunction.value_from_players_real_estate()"""
+        warnings.warn("This function is deprecated.", UserWarning)
         return self.value_function.value_from_players_real_estate(
             streets_for_calculation=streets_for_calculation, 
             villages_for_calculation=villages_for_calculation, 
@@ -347,12 +378,11 @@ class Player_Value_Function_Based(Player):
         )
 
     
-    def calculate_value(self):
-        """ Legacy, this function now refers to Py_Catan.ValueFunction.value_for_player()"""
-        return self.value_function.value_for_player(self)
+
     
     def calc_earning_power_for_player(self):
         ''' Legacy, this function now refers to Py_Catan.ValueFunction.calc_earning_power_for_player()'''
+        warnings.warn("This function is deprecated.", UserWarning)
         self.earning_power = self.value_function.calc_earning_power_for_player(self) # potentially obsolete parameter!
         return self.earning_power
         # self.earning_power = np.sum(self.structure.node_earning_power[self.villages == 1],axis=0) + 2*np.sum(self.structure.node_earning_power[self.towns == 1],axis=0)
@@ -360,64 +390,67 @@ class Player_Value_Function_Based(Player):
         
     def calc_earning_power_for_additional_village(self,extra_villages):
         ''' Legacy, this function now refers to Py_Catan.ValueFunction.calc_earning_power_for_additional_village()'''
+        warnings.warn("This function is deprecated.", UserWarning)
         return self.value_function.calc_earning_power_for_additional_village(extra_villages)
+    
+
         # This function calculates the earning power for an additional village
     #     return np.sum(self.structure.node_earning_power[extra_villages == 1],axis=0)
 
-    def generate_values_for_possible_actions(self, 
-                          possible_actions: list,
-                         ) -> list:
-        '''
-         ==== generate all options with values, then sort on order of possible actions and return a list with values ====
-         ==== Not efficient but same interface as model based player ===
-        Generate values for all possible actions.
-        The actions are given as a list of tuples, where the first element is the action type
-        and the second element is the action parameters.
-        The action types are:
-        - 'street': build a street on the given edge
-        - 'village': build a village on the given node
-        - 'town': build a town on the given node
-        - 'trade_player': trade with another player
-        - 'trade_specific_player': trade with a specific player
-        - 'trade_bank': trade with the bank
-        '''
- 
-        #
-        #initial_value_hand = self.calculate_value_hand()
-        #initial_value = self.calculate_value()
-        #initial_value_real_estate = initial_value - initial_value_hand
-        values = []
-        for action in possible_actions:
-            if action[0] == 'street':
-                options = self.explore_building_street(edge=action[1])
-                best_value = options[0][0]
-                values.append(best_value)
-            elif action[0] == 'village':
-                options = self.explore_building_village(node=action[1])
-                best_value = options[0][0]
-                values.append(best_value)
-            elif action[0] == 'town':
-                options = self.explore_building_town(node=action[1])
-                best_value = options[0][0]
-                values.append(best_value)
-            elif action[0] == 'trade_player':
-                options = self.explore_trading_with_other_player(card_out_in=action[1])
-                best_value = options[0][0] #+ initial_value_real_estate
-                values.append(best_value)   
-            elif action[0] == 'trade_specific_player':
-                options = self.explore_trading_with_specific_player(card_out_in_partner=action[1][0])
-                best_value = options[0][0] #+ initial_value_real_estate
-                values.append(best_value)
-            elif action[0] == 'trade_bank':
-                options = self.explore_trading_with_bank(action[1])
-                best_value = options[0][0] #+ initial_value_real_estate
-                values.append(best_value)
-            elif action[0] is None:
-                # No action, just return the current value
-                values.append(self.calculate_value())
-            else:
-                raise Exception(f'Unknown action type: {action[0]}')    
-        return values
+    # def generate_values_for_possible_actions(self, 
+    #                       possible_actions: list,
+    #                      ) -> list:
+    #     '''
+    #      ==== generate all options with values, then sort on order of possible actions and return a list with values ====
+    #      ==== Not efficient but same interface as model based player ===
+    #     Generate values for all possible actions.
+    #     The actions are given as a list of tuples, where the first element is the action type
+    #     and the second element is the action parameters.
+    #     The action types are:
+    #     - 'street': build a street on the given edge
+    #     - 'village': build a village on the given node
+    #     - 'town': build a town on the given node
+    #     - 'trade_player': trade with another player
+    #     - 'trade_specific_player': trade with a specific player
+    #     - 'trade_bank': trade with the bank
+    #     '''
+    #     warnings.warn("This function is deprecated. Use player.generate_values_for_options() instead.", UserWarning)
+    #     #
+    #     #initial_value_hand = self.calculate_value_hand()
+    #     #initial_value = self.calculate_value()
+    #     #initial_value_real_estate = initial_value - initial_value_hand
+    #     values = []
+    #     for action in possible_actions:
+    #         if action[0] == 'street':
+    #             options = self.explore_building_street(edge=action[1])
+    #             best_value = options[0][0]
+    #             values.append(best_value)
+    #         elif action[0] == 'village':
+    #             options = self.explore_building_village(node=action[1])
+    #             best_value = options[0][0]
+    #             values.append(best_value)
+    #         elif action[0] == 'town':
+    #             options = self.explore_building_town(node=action[1])
+    #             best_value = options[0][0]
+    #             values.append(best_value)
+    #         elif action[0] == 'trade_player':
+    #             options = self.explore_trading_with_other_player(card_out_in=action[1])
+    #             best_value = options[0][0] #+ initial_value_real_estate
+    #             values.append(best_value)   
+    #         elif action[0] == 'trade_specific_player':
+    #             options = self.explore_trading_with_specific_player(card_out_in_partner=action[1][0])
+    #             best_value = options[0][0] #+ initial_value_real_estate
+    #             values.append(best_value)
+    #         elif action[0] == 'trade_bank':
+    #             options = self.explore_trading_with_bank(action[1])
+    #             best_value = options[0][0] #+ initial_value_real_estate
+    #             values.append(best_value)
+    #         elif action[0] is None:
+    #             # No action, just return the current value
+    #             values.append(self.calculate_value())
+    #         else:
+    #             raise Exception(f'Unknown action type: {action[0]}')    
+    #     return values
     
     # =============================================================================================
 

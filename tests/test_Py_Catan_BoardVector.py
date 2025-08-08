@@ -421,7 +421,7 @@ def test_consistency_of_values():
     for _ in range(10):
         for position,player in enumerate(board.players):
             list_of_actions_1 = player.generate_list_of_possible_actions()
-            values_1 = player.generate_values_for_possible_actions(list_of_actions_1)
+            values_1 = player.generate_values_for_possible_actions(list_of_actions_1)[...,position]
             random_index = np.random.randint(0, len(list_of_actions_1))
             random_action = list_of_actions_1[random_index]
             new_vctr = vctr.copy()

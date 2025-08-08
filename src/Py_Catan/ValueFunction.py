@@ -4,6 +4,7 @@ from Py_Catan.Player import Player
 from Py_Catan.Board import Board
 from Py_Catan.BoardVector import BoardVector
 import numpy as np
+import warnings
 
 class ValueFunction:
     def __init__(self, preference: PlayerPreferences, structure: BoardStructure, player: Player = None):
@@ -52,6 +53,17 @@ class ValueFunction:
         return self.value_for_board_vector(board_vector)
     
     def value_for_player(self, player: Player) -> float:
+        """
+        Calculate the value for a specific player based on their current state and preferences.
+
+        Args:
+            player (Player): The player for whom the value is calculated.
+
+        Returns:
+            float: The calculated value for the player.
+        """
+        if player._players_in_this_game == [] or player._board is None or player._player_position is None:
+            warnings.warn("We are using ValueFunction.value_for_player() on a player that is not properly assigned to a board.", UserWarning)
         value = 0.0
         # calculate score
         score = 0
@@ -107,12 +119,17 @@ class ValueFunction:
 
         return value
     
+    # ====================================================================================
+    #
+    # Deprecated methods, kept for backward compatibility
+    #
+    # ====================================================================================
     def value_from_players_hand(self, hand_for_calculation: np.ndarray = None):
         '''
         Calculate the value of the player's hand based on the preferences.
         If hand_for_calculation is provided, it will be used instead of the player's hand.
         '''
-        print("Deprecated 'value_from_players_hand'")
+        warnings.warn("This function is deprecated.", UserWarning)
         if hand_for_calculation is None:
             hand_for_calculation = self.player.hand
         penalty_factor = (sum(hand_for_calculation)/(sum(hand_for_calculation)+self.preference.penalty_reference_for_too_many_cards) )
@@ -143,7 +160,7 @@ class ValueFunction:
         '''
         Calculate the value of the player's real estate based on the preferences.
         '''
-        print("Deprecated 'value_from_players_real_estate")
+        warnings.warn("This function is deprecated.", UserWarning)
         if streets_for_calculation is None:
             streets = self.player.streets
         if villages_for_calculation is None:
@@ -180,9 +197,9 @@ class ValueFunction:
         return value
     
     def calc_earning_power_for_player(self,player: Player):
-        print("Deprecated 'calc_earning_power_for_player")
+        warnings.warn("This function is deprecated.", UserWarning)
         return np.sum(self.structure.node_earning_power[player.villages == 1],axis=0) + 2*np.sum(self.structure.node_earning_power[player.towns == 1],axis=0)
     
     def calc_earning_power_for_additional_village(self,extra_villages):
-        print("Deprecated 'calc_earning_power_for_additional_village'")
+        warnings.warn("This function is deprecated.", UserWarning)
         return np.sum(self.structure.node_earning_power[extra_villages == 1],axis=0)
