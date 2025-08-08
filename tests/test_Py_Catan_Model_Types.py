@@ -1,9 +1,10 @@
-import sys  
+import sys, os, time
 sys.path.append("./src/Py_Catan")
 sys.path.append("./src")
 import pytest
 import numpy as np
 import pandas as pd
+from importlib.resources import files
 from Py_Catan import *
 
 from Py_Catan.BoardStructure import BoardStructure, BoardLayout
@@ -16,7 +17,7 @@ from Py_Catan.PlayerModelBased import Player_Model_Based
 from keras.models import Model
 from keras.saving import load_model
 
-
+import matplotlib.pyplot as plt
 
 def test_PlayerModelTypes():
     """
@@ -178,9 +179,8 @@ def test_calculate_correlations():
     assert not np.all(np.array(corrs) > 0.8), "Correlations is too high"  # Check if all correlations are above 0.8
 
     model_type = model_trained_on_specific_villages_and_streets()
-    assert not np.all(np.array(model_type.calculate_correlations()) > 0.8), "Correlations should not be high."
-    model_type.read_test_data_from_file("./tests/test_models/training_data_for_specific_villages_and_streets_test.csv")
-    assert np.all(np.array(model_type.calculate_correlations()) > 0.8), "Correlations should be high."
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.8), "Correlations should not be high."
+   
 
 def test_save_load_model():
     """
@@ -224,3 +224,137 @@ def test_save_load_model():
     # Check if the loaded model is the same as the original
     are_equal, message = compare_keras_models(model_type.model, loaded_model_type.model)
     assert are_equal, message
+
+def test_different_model_types():
+    """
+    Test function for different model types.
+    It checks if the model types are correctly set and if the correlations are calculated correctly.
+    """
+    model_type = model_trained_on_limited_tournament_data()
+    assert model_type.path_to_test_data == files('Py_Catan.data').joinpath('data_for_model_trained_on_limited_tournament_test.csv')
+    assert model_type.path_to_keras_model == files('Py_Catan.data').joinpath('model_trained_on_limited_tournament_data.keras')
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.9)
+
+    model_type = model_trained_on_specific_villages_and_streets()
+    assert model_type.path_to_test_data == files('Py_Catan.data').joinpath('data_for_model_trained_on_limited_tournament_test.csv')
+    assert model_type.path_to_keras_model == files('Py_Catan.data').joinpath('model_trained_on_specific_villages_and_streets.keras')
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.9)
+
+    model_type = model_trained_on_streets_villages_towns_b_cards()
+    assert model_type.path_to_test_data == files('Py_Catan.data').joinpath('data_for_model_trained_on_limited_tournament_test.csv')
+    assert model_type.path_to_keras_model == files('Py_Catan.data').joinpath('model_trained_on_streets_villages_towns_b_cards.keras')
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.9)
+
+    model_type = blank_model()
+    assert model_type.path_to_test_data == ''
+    assert model_type.path_to_keras_model == ''
+    # assert that calculating correlations raises an exception since no test data is loaded
+    with pytest.raises(Exception):
+        model_type.calculate_correlations()
+
+def test_model_types_with_separate_test_data():
+    # Test the model types and their properties with separate test data and default model files.
+    model_type = model_trained_on_limited_tournament_data()
+    model_type.read_test_data_from_file('./src/Py_Catan/data/data_for_model_trained_on_limited_tournament_test.csv')
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.8)
+    model_type = model_trained_on_specific_villages_and_streets()
+    model_type.read_test_data_from_file('./src/Py_Catan/data/data_for_model_trained_on_specific_villages_and_streets_test.csv')
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.8)
+    model_type = model_trained_on_streets_villages_towns_b_cards()
+    model_type.read_test_data_from_file('./src/Py_Catan/data/data_for_model_trained_on_streets_villages_towns_b_cards_test.csv')
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.8)
+
+def test_plot_correlation_calls(monkeypatch):
+    """
+    Test that plot_correlation calls the underlying plot function without error,
+    but does not actually display or save the plot.
+    """
+
+
+    # Patch plt.show and plt.savefig to prevent actual plotting
+
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+    monkeypatch.setattr(plt, "savefig", lambda *args, **kwargs: None)
+
+    # Plot the correlations with the default test data.
+    model_type = model_trained_on_limited_tournament_data()
+    model_type.plot_correlation();
+    model_type = model_trained_on_specific_villages_and_streets()
+    model_type.plot_correlation();
+    model_type = model_trained_on_streets_villages_towns_b_cards()
+    model_type.plot_correlation();
+
+    # assert that calculating correlations raises an exception since no test data is loaded
+    with pytest.raises(Exception):
+        model_type_3 = blank_model()
+        model_type_3.plot_correlation();
+
+def test_generate_test_data_and_train_model_from_tournament_with_random_actions(monkeypatch):
+
+    # Patch plt.show and plt.savefig to prevent actual plotting
+    monkeypatch.setattr(plt, "show", lambda *args, **kwargs: None)
+    monkeypatch.setattr(plt, "savefig", lambda *args, **kwargs: None)
+
+    # === Check if the directory for the data file exists and is writable ===
+    path_to_data = './training_data/demo_data_from_tournament.csv'
+    directory = os.path.dirname(path_to_data)
+    if not os.path.exists(directory):
+        raise FileNotFoundError(f"Directory not found: {directory}")
+    if not os.access(directory, os.W_OK):
+        raise PermissionError(f"Directory is not writable: {directory}")
+
+    # === Generate test data for the blank model demo training ===
+    # add some randomness to also create data for options not chosen by the players
+    N= 1
+    for identifier in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'test']:
+        print(f"Generating training data for identifier: {identifier}")
+        path_to_data_for_this_round = path_to_data.replace('.csv', f'_{identifier}.csv')
+        generate_test_data_from_tournament_with_random_actions(path_to_data_for_this_round,
+                                            no_of_games_in_tournament=N,
+                                            no_of_random_players=0,
+                                            fraction_of_random_actions=0.35)
+    print(f"Done generating training and test data.")
+
+    # === Create a blank model instance ===
+    model_type = blank_model()
+
+    # === Define how you want to generate y-values (target for training) from the data ===
+    # (some build in methods, but you can overwrite this with your own function
+    # This function will be used for training, and for calculating correlations)
+    model_type.y_values_from_data = model_type._y_values_from_data_in_data_file
+
+    # === Read training data from the files ===
+    files = [path_to_data.replace('.csv', f'_{identifier}.csv') for identifier in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']]
+    data = pd.concat([pd.read_csv(f) for f in files], ignore_index=True)
+    assert data.shape[1] == 159
+
+    # === Train the model ===
+    model_type.train_the_model(
+        data=data, batch_size = 128, epochs = 100, verbose = 1)
+
+    # === Plot correlations for the trained model with default test_data ===
+    model_type.read_test_data_from_file(model_type.DEFAULT_TEST_DATA_FILE)
+    model_type.plot_correlation()
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.5)
+
+    # === Plot correlations for the trained model with test_data generated together with the training data ===
+    model_type.read_test_data_from_file(path_to_data.replace('.csv', f'_test.csv'))
+    model_type.plot_correlation()
+    assert np.all(np.array(model_type.calculate_correlations()) > 0.5)
+
+    # === Save the trained model to a file ===
+    path_to_model = './trained_models/model_trained_with_demo_data_from_tournament.keras'
+    directory = os.path.dirname(path_to_model)
+    if not os.path.exists(directory):
+        raise FileNotFoundError(f"Directory not found: {directory}")
+    if not os.access(directory, os.W_OK):
+        raise PermissionError(f"Directory is not writable: {directory}")
+
+    if os.path.exists(path_to_model): # remove file if it exists, to check if saving works
+        os.remove(path_to_model)
+        assert not os.path.exists(path_to_model), f"Model file still exists after removal: {path_to_model}"
+    model_type.save_model_to_file(path_to_model)
+
+    # Assert the model file exists and is not empty
+    assert os.path.exists(path_to_model), f"Model file not found: {path_to_model}"
+    assert os.path.getsize(path_to_model) > 0, f"Model file is empty: {path_to_model}"

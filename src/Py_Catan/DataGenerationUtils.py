@@ -176,7 +176,7 @@ def split_file_in_test_train_data(
         file_name_for_logging: str = "data_for_model_random_streets_villages_towns_hands.csv",
         no_of_test_vectors: int = 1000,
         file_extension: str = '.csv'
-        ) -> None:
+        ) -> tuple:
     """
     Load the csv into a DataFrame, split it into test and train data with attribute 'no_of_test_vectors' determining size
     of the test set. The test set is removed from the DataFrame and saved to a separate file. The remaining DataFrame is saved as the train set.
@@ -185,10 +185,18 @@ def split_file_in_test_train_data(
 
     Data is shuffled before splitting to ensure randomness in the test and train sets.
 
+    The file names of the train and test sets are returned as a tuple (file_name_train, file_name_test)
+
+    Typical use case: 
+    - training_data, testing_data = split_file_in_test_train_data(file_name_for_logging = path_to_data)
+                                            
     Args:
         file_name_for_logging (str, optional): _description_. Defaults to "data_for_model_random_streets_villages_towns_hands.csv".
         no_of_test_vectors (int, optional): _description_. Defaults to 1000.
         file_extension (str, optional): _description_. Defaults to '.csv'.
+
+    Returns:
+        tuple: A tuple containing the file names of the train and test sets.
     """
     df = pd.read_csv(file_name_for_logging)
     if no_of_test_vectors > len(df):
@@ -204,7 +212,7 @@ def split_file_in_test_train_data(
     # to_csv will overwrite an existing file with the same name
     test_df.to_csv(test_file_name, index=False) 
     train_df.to_csv(train_file_name, index=False)
-    return
+    return train_file_name, test_file_name
 
 def generate_test_data_from_tournament(
         file_name: str = 'data_from_tournament.csv',
@@ -230,6 +238,44 @@ def generate_test_data_from_tournament(
         players.append(Player_Random(name=f'Player_{i}', structure=structure))
     for i in range(no_of_random_players, 4):
         players.append(Player_Value_Function_Based(name=f'Player_{i}', structure=structure, preference=preference))
+
+    # === set up tournament ===
+    tournament = Tournament()
+    tournament.no_games_in_tournament = no_of_games_in_tournament
+    tournament.verbose = False
+    tournament.logging = True
+    tournament.file_name_for_logging = file_name
+    player_tournament_results, player_victory_points, rounds_for_this_game = tournament.tournament(structure, players)
+    return 
+
+def generate_test_data_from_tournament_with_random_actions(
+                                            file_name: str = 'data_from_tournament.csv',
+                                            no_of_games_in_tournament: int = 1000,
+                                            no_of_random_players: int = 3,
+                                            fraction_of_random_actions: float = 0.5):
+    """
+    Generates test data from a tournament of players in the Catan game.
+    The data is saved in a CSV file with the default name 'data_from_tournament.csv'.
+    This function creates a board structure, initializes a board vector, and generates random data
+    for the tournament. It sets up players with a mix of random and value function-based strategies.
+    """
+        
+    board_layout = BoardLayout(tile_layout='DSWOSBWWGSGSBGWOGOB')
+    structure = BoardStructure(board_layout=board_layout)
+    structure.winning_score = 8
+    board = Board(structure=structure)
+    b_vector = BoardVector(board=board)  
+    preference = pppt.optimized_1_with_0_for_full_score
+
+    # === set up players ===
+    players = []
+    for i in range(no_of_random_players):
+        players.append(Player_Random(name=f'Player_{i}', structure=structure))
+    for i in range(no_of_random_players, 4):
+        players.append(Player_Value_Based_With_Randomness(name=f'Player_{i}', 
+                                                          structure=structure, 
+                                                          preference=preference,
+                                                          fraction_of_random_actions=fraction_of_random_actions))
 
     # === set up tournament ===
     tournament = Tournament()

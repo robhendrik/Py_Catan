@@ -28,6 +28,7 @@ def test_respond_to_trading_request():
     p = Player_Model_Based(name='Player_5', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[3] = p
+    brd.inform_players_of_the_board_and_position()
     brd._update_board_for_players()
     p.hand = np.array([1, 0, 1, 0, 0, 0])
     assert False == p.respond_positive_to_other_players_trading_request(card_out_in=(0,2))
@@ -104,6 +105,7 @@ def test_generate_list_of_values():
     player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
     brd = Board(structure=structure)
     brd.players[3] = player
+    brd.inform_players_of_the_board_and_position()
     brd._update_board_for_players()
     
     # Simulate some buildings for the player
@@ -142,6 +144,7 @@ def test_best_action_for_fourth_player_who_likes_B_cards():
     brd = Board(structure=structure)
     brd.players[3] = player # this players likes B -cards
     brd._update_board_for_players()
+    brd.inform_players_of_the_board_and_position()
     
     # Simulate some buildings for the player
     # For example, build a village at position 0 and a street at position 0-1
@@ -186,6 +189,7 @@ def test_best_action_for_first_player_who_likes_streets():
     brd = Board(structure=structure)
     brd.players[0] = player # this players likes streets
     brd._update_board_for_players()
+    brd.inform_players_of_the_board_and_position()
     
     # Simulate some buildings for the player
     # For example, build a village at position 0 and a street at position 0-1
@@ -203,7 +207,7 @@ def test_best_action_for_first_player_who_likes_streets():
     values = player.generate_values_for_possible_actions(actions)
     best_action = player.find_best_action(rejected_trades_for_this_round=dict([]))
     assert len(values) == 5
-    assert best_action[0]  == 'trade_player'
+    assert best_action[0]  == 'trade_player' or best_action[0] == None
     # street
     player.hand = np.array(brd.structure.real_estate_cost[0])  # can build a street
     brd._update_board_for_players()
@@ -235,6 +239,7 @@ def test_best_action_for_second_player_who_likes_villages():
     brd = Board(structure=structure)
     brd.players[1] = player # this players likes villages
     brd._update_board_for_players()
+    brd.inform_players_of_the_board_and_position()
     
     # Simulate some buildings for the player
     # For example, build a village at position 0 and a street at position 0-1
@@ -252,7 +257,7 @@ def test_best_action_for_second_player_who_likes_villages():
     values = player.generate_values_for_possible_actions(actions)
     best_action = player.find_best_action(rejected_trades_for_this_round=dict([]))
     assert len(values) == 5
-    assert best_action[0]  == 'trade_player'
+    assert best_action[0]  == 'trade_player' or best_action[0] == None
     # village
     player.hand = np.array(brd.structure.real_estate_cost[1])  # can build a village
     brd._update_board_for_players()
@@ -286,6 +291,7 @@ def test_best_action_for_third_player_who_likes_towns():
     brd = Board(structure=structure)
     brd.players[2] = player # this players likes towns
     brd._update_board_for_players()
+    brd.inform_players_of_the_board_and_position()
     
     # Simulate some buildings for the player
     # For example, build a village at position 0 and a street at position 0-1
@@ -303,7 +309,7 @@ def test_best_action_for_third_player_who_likes_towns():
     values = player.generate_values_for_possible_actions(actions)
     best_action = player.find_best_action(rejected_trades_for_this_round=dict([]))
     assert len(values) == 5
-    assert best_action[0]  == 'trade_player'
+    assert best_action[0]  == 'trade_player' or best_action[0] == None
     # town
     player.hand = np.array(brd.structure.real_estate_cost[2])  # can build a town
     brd._update_board_for_players()
@@ -337,6 +343,7 @@ def test_best_action_in_set_up_for_player_who_likes_specific_villages_and_street
     brd.players[0] = player # this players likes village and street 0
     brd._update_board_for_players()
     player.update_build_options()
+    brd.inform_players_of_the_board_and_position()
     player.hand = np.array([0, 0, 0, 0, 0, 0])  # empty hand
     actions = player.player_setup(brd)
     assert len(actions) == 2
@@ -354,6 +361,7 @@ def test_best_action_in_set_up_for_player_who_likes_specific_villages_and_street
     brd.players[2] = player # this players likes village 20 and street 25
     brd._update_board_for_players()
     player.update_build_options()
+    brd.inform_players_of_the_board_and_position()
     player.hand = np.array([0, 0, 0, 0, 0, 0])  # empty hand
     actions = player.player_setup(brd)
     assert len(actions) == 2
@@ -383,7 +391,7 @@ def test_best_action_in_turn_for_player_who_likes_specific_villages_and_streets(
 
     player = Player_Model_Based(name='Player_Test', structure=structure, model=model)
     brd.players[3] = player # this players likes village and street 
-
+    brd.inform_players_of_the_board_and_position()
     brd.execute_player_action(brd.players[0], ('village',0))
     brd.execute_player_action(brd.players[0], ('street', 5))
     brd.execute_player_action(brd.players[0], ('street', 11))

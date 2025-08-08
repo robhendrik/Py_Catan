@@ -4,15 +4,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from Py_Catan.Board import Board
-from Py_Catan.BoardStructure import BoardStructure, BoardLayout
+# from Py_Catan.BoardStructure import BoardStructure, BoardLayout
 from Py_Catan.Player import Player
-from Py_Catan.Preferences import PlayerPreferences
-from Py_Catan.PlayerValueFunctionBased import Player_Value_Function_Based
-from Py_Catan.PlayerRandom import Player_Random
-from Py_Catan.PlayerPassive import Player_Passive
-from Py_Catan.PlotBoard import PlotCatanBoard
-from Py_Catan.Tournament import Tournament
-import Py_Catan.Player_Preference_Types as pppt
+# from Py_Catan.Preferences import PlayerPreferences
+# #from Py_Catan.PlayerValueFunctionBased import Player_Value_Function_Based
+# from Py_Catan.PlayerRandom import Player_Random
+# from Py_Catan.PlayerPassive import Player_Passive
+# from Py_Catan.PlotBoard import PlotCatanBoard
+# from Py_Catan.Tournament import Tournament
+# import Py_Catan.Player_Preference_Types as pppt
 
 class BoardVector:
     def __init__(self, board: Board = Board(), include_values: bool = True):
@@ -22,8 +22,26 @@ class BoardVector:
         self.include_values = include_values
         self.indices = self.get_indices()
         self.vector = self.create_vector_from_board()
-        
+        # check is include values give correct result
+            
 
+    def copy(self) -> 'BoardVector':
+        '''
+        Create a copy of the player with the same attributes.
+        The name is set to 'New' to avoid conflicts with the original player.
+
+        Overwrites the function in parent class.
+        '''        
+        new_vector = BoardVector(self.board, include_values=self.include_values)
+        np = vars(new_vector)
+        for k,v in vars(self).items():
+            if k != 'name':
+                try:
+                    np[k] = v.copy()
+                except:
+                    np[k] = v
+        return new_vector
+    
     def header(self) -> list[str]:
         '''
         Create a header for the vector representation of the board.
@@ -137,36 +155,52 @@ class BoardVector:
         
         # return np.concatenate([precursor,values,nodes,edges,hands])
     
-    def create_board_from_vector(self) -> Board:
+    def create_board_from_vector(self, player_type=Player, list_of_players: list = None) -> Board:
         '''
-        Create a board with value based players from a vector representation.
+        Create a board with players (of given type) from a vector representation.
         The vector contains the occupied nodes and edges, and the players' hands.
 
+        If the player_type is None, the players are copied from the self.player for this vector instance 
+        (i.e., the player type for the board used to generate this vector).
+
+        If list_of_players is provided, it is used to create the players instead of creating new ones.
+
+        Args:
+            player_type (type): The class to use for player instances (default: Player).
+
         Returns:
-            Board: A Board object with value based players.
+            Board: A Board object with players of the specified type.
         '''
-        precursor = self.vector[:self.indices['values'][0]]
-        values = self.vector[self.indices['values']]
+        # Create new instances of the same type as self.player (if available), otherwise use default Player
+        if list_of_players is None:
+            if player_type is None:
+                player_type = type(self.player) if self.player is not None else Player
+            list_of_players = [player_type(name=f'Player_{i+1}', structure=self.structure) for i in range(4)]
+
         nodes = self.vector[self.indices['nodes']]
         edges = self.vector[self.indices['edges']]
-        hands = self.vector[self.indices['hands']]
-        
+        hands = [self.vector[self.indices['hand_for_player'][i]] for i in range(4)]
+
         occupied_nodes = np.zeros(self.structure.no_of_nodes)
         occupied_edges = np.zeros(self.structure.no_of_edges)
         players = []
         for i in range(4):
-            player = Player_Value_Function_Based(name=f'Player_{i+1}', structure=self.structure)
+            player = list_of_players[i]
             player.villages = np.where(nodes == i+1, 1, 0)
             player.towns = np.where(nodes == i+5, 1, 0)
             player.streets = np.where(edges == i+1, 1, 0)
-            player.hand = self.vector[self.indices['hand_for_player'][i]]
+            player.hand = hands[i]
             occupied_edges = np.logical_or(occupied_edges, player.streets)
             occupied_nodes = np.logical_or(occupied_nodes, player.villages + player.towns)
             players.append(player)
         board = Board(structure=self.structure, players=players)
         board.occupied_nodes = occupied_nodes
         board.occupied_edges = occupied_edges
-        board._update_board_for_players()
+        board.inform_players_of_the_board_and_position()
+        board.sync_status_between_board_and_players()
+        # board._update_board_for_players()
+        # for player in players:
+        #     player.update_build_options()
         
         return board
 
@@ -177,6 +211,9 @@ class BoardVector:
 
         Function returns a new vector as np.array with the updated resources and the street built.
 
+        NOTE: The function does not update the board_vector, but returns a numpy array! To update 'self' 
+        you can use 'self.vector = self.execute_action(player_position, action)'.
+        
         Returns:
             np.array: A new vector with the updated resources and the street built.
         '''
@@ -194,6 +231,9 @@ class BoardVector:
         Removes the cost of the village from the player's hand and updates the board vector.
 
         Function returns a new vector as np.array with the updated resources and the village built.
+
+        NOTE: The function does not update the board_vector, but returns a numpy array! To update 'self' 
+        you can use 'self.vector = self.execute_action(player_position, action)'.
 
         Returns:
             np.array: A new vector with the updated resources and the village built.
@@ -213,6 +253,9 @@ class BoardVector:
 
         Function returns a new vector as np.array with the updated resources and the town built.
 
+        NOTE: The function does not update the board_vector, but returns a numpy array! To update 'self' 
+        you can use 'self.vector = self.execute_action(player_position, action)'.
+
         Returns:
             np.array: A new vector with the updated resources and the town built.
         '''
@@ -230,6 +273,9 @@ class BoardVector:
         If player_from is None, the resources are only changed for player_position.
 
         Function returns a new vector as np.array with the updated resources.
+
+        NOTE: The function does not update the board_vector, but returns a numpy array! To update 'self' 
+        you can use 'self.vector = self.execute_action(player_position, action)'.
 
         Returns:
             np.array: A new vector with the updated resources after the trade.
@@ -253,6 +299,9 @@ class BoardVector:
 
         Function returns a new vector as np.array with the updated resources.
 
+        NOTE: The function does not update the board_vector, but returns a numpy array! To update 'self' 
+        you can use 'self.vector = self.execute_action(player_position, action)'.
+
         Returns:
             np.array: A new vector with the updated resources after the trade with the bank.
         '''
@@ -263,6 +312,43 @@ class BoardVector:
         indices_for_hand = self.indices['hand_for_player'][player_position]
         new_vector[indices_for_hand] += resources
         return new_vector
+    
+    def execute_action(self, player_position: int, action: tuple) -> np.array:
+        '''
+        Execute an action on the board. The action is given as a tuple of the form (action_type, action_parameters).
+        The action type can be 'build_street', 'build_village', 'build_town', 'trade_between_players', or 'trade_with_bank'.
+        The action parameters are the indices of the edge or node to build on, or the resources to trade.
+
+        Function returns a new vector as np.array with the updated resources and the action executed.
+
+        NOTE: The function does not update the board_vector, but returns a numpy array! To update 'self' 
+        you can use 'self.vector = self.execute_action(player_position, action)'.
+
+        The action types are:
+        - 'street': build a street on the given edge 
+        - 'village': build a village on the given node
+        - 'town': build a town on the given node
+        - 'trade_player': trade with another player
+        - 'trade_specific_player': trade with a specific player
+        - 'trade_bank': trade with the bank
+
+        Returns:
+            np.array: A new vector with the updated resources after executing the action.
+        '''
+        if action[0] == 'street':
+            return self.build_street(player_position=player_position, edge_index=action[1])
+        elif action[0] == 'village':
+            return self.build_village(player_position=player_position, node_index=action[1])
+        elif action[0] == 'town':
+            return self.build_town(player_position=player_position, node_index=action[1])
+        elif action[0] == 'trade_player' or action[0] == 'trade_specific_player':
+            return self.trade_between_players(player_position=player_position,
+                                               card_out_in=action[1],
+                                               player_accepting_trade=action[2] if len(action) > 2 else None)
+        elif action[0] == 'trade_bank':
+            return self.trade_with_bank(player_position=player_position, card_out_in=action[1])
+        else:
+            raise ValueError(f"Unknown action type: {action[0]}")   
     
     def split_vector(self, vector: np.array = None) -> list[np.array]:
         '''
@@ -285,7 +371,25 @@ class BoardVector:
         vectors += [vector[self.indices['hands']]]
 
         return vectors
+    
+    def add_values_to_vector(self, player_type=Player) -> None:
+        '''
+        Add the values of the players to the vector.
+        The values are calculated using the calculate_value method of the player type.
 
-    
-    
-    
+        Args:
+            player_type (type): The class to use for player instances (default: Player).
+
+        Returns:
+            np.array: A new vector with the values added.
+        '''
+
+        new_board = self.create_board_from_vector(player_type =player_type)
+        new_board._update_board_for_players()
+        values = np.zeros(len(new_board.players), np.float64)
+        for i, p in enumerate(new_board.players):
+            p.update_build_options()
+            values[i] = p.calculate_value()
+        value_indices = self.indices['values']
+        self.vector[value_indices] = values
+        return

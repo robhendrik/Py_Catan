@@ -355,15 +355,15 @@ def test_board_vector_multiple_actions():
     # Create a board
     board = Board() 
     board.players[0].hand = np.array(board.structure.real_estate_cost[0])
-    board.execute_player_action(board.players[0], ('build_street', 0))
+    board.execute_player_action(board.players[0], ('street', 0))
     board.players[1].hand = np.array(board.structure.real_estate_cost[0])
-    board.execute_player_action(board.players[0], ('build_street', 10))
+    board.execute_player_action(board.players[0], ('street', 10))
     board.players[2].hand = np.array(board.structure.real_estate_cost[1])
-    board.execute_player_action(board.players[0], ('build_village', 0))
+    board.execute_player_action(board.players[0], ('village', 0))
     board.players[3].hand = np.array(board.structure.real_estate_cost[1])
-    board.execute_player_action(board.players[0], ('build_village', 20))
+    board.execute_player_action(board.players[0], ('village', 20))
     board.players[3].hand = np.array(board.structure.real_estate_cost[2])
-    board.execute_player_action(board.players[0], ('build_town', 20))
+    board.execute_player_action(board.players[0], ('town', 20))
     board.players[0].hand = np.array(board.structure.real_estate_cost[0])
     board.players[1].hand = np.array(board.structure.real_estate_cost[0]) + np.array([0,0,0,0,0,1])  # Add a resource to player 1's hand
     board.players[2].hand = np.array([10,0,0,0,0,0])
@@ -391,3 +391,74 @@ def test_board_vector_multiple_actions():
 
 
     assert np.array_equal(final_board_vector.vector, original_board_vector.vector), "The original vector and the new vector are not equal."
+
+def test_consistency_of_values():
+    board = Board() 
+    board.players = [
+        Player_Value_Function_Based(name='Player 1'),
+        Player_Value_Function_Based(name='Player 2'),
+        Player_Value_Function_Based(name='Player 3'),   
+        Player_Value_Function_Based(name='Player 4')
+    ]
+    board.players[0].hand = np.array(board.structure.real_estate_cost[0])
+    board.execute_player_action(board.players[0], ('street', 0))
+    board.players[1].hand = np.array(board.structure.real_estate_cost[0])
+    board.execute_player_action(board.players[0], ('street', 10))
+    board.players[2].hand = np.array(board.structure.real_estate_cost[1])
+    board.execute_player_action(board.players[0], ('village', 0))
+    board.players[3].hand = np.array(board.structure.real_estate_cost[1])
+    board.execute_player_action(board.players[0], ('village', 20))
+    board.players[3].hand = np.array(board.structure.real_estate_cost[2])
+    board.execute_player_action(board.players[0], ('town', 20))
+    board.players[0].hand = np.array(board.structure.real_estate_cost[0])
+    board.players[1].hand = np.array(board.structure.real_estate_cost[0]) + np.array([0,0,0,0,0,1])  # Add a resource to player 1's hand
+    board.players[2].hand = np.array([10,0,0,0,0,0])
+    board.players[3].hand = np.array(board.structure.real_estate_cost[2]) + np.array(board.structure.real_estate_cost[1])
+    board._update_board_for_players()
+    for player in board.players:
+        player.update_build_options()
+    vctr = BoardVector(board, include_values=True) 
+    for _ in range(10):
+        for position,player in enumerate(board.players):
+            list_of_actions_1 = player.generate_list_of_possible_actions()
+            values_1 = player.generate_values_for_possible_actions(list_of_actions_1)
+            random_index = np.random.randint(0, len(list_of_actions_1))
+            random_action = list_of_actions_1[random_index]
+            new_vctr = vctr.copy()
+            new_vctr.execute_action(player_position = position, action = random_action)
+            new_board = new_vctr.create_board_from_vector(player_type =Player_Value_Function_Based)
+            new_board._update_board_for_players()
+            for p in new_board.players:
+                p.update_build_options()
+            new_value = board.players[position].calculate_value()
+            assert new_value == values_1[random_index], f"Value {new_value} does not match expected value {values_1[random_index]} for action {random_action} at position {position}"
+
+def test_add_values_to_vector():
+    board = Board() 
+    board.players = [
+        Player_Value_Function_Based(name='Player 1'),
+        Player_Value_Function_Based(name='Player 2'),
+        Player_Value_Function_Based(name='Player 3'),   
+        Player_Value_Function_Based(name='Player 4')
+    ]
+    board.players[0].hand = np.array(board.structure.real_estate_cost[0])
+    board.execute_player_action(board.players[0], ('street', 0))
+    board.players[1].hand = np.array(board.structure.real_estate_cost[0])
+    board.execute_player_action(board.players[0], ('street', 10))
+    board.players[2].hand = np.array(board.structure.real_estate_cost[1])
+    board.execute_player_action(board.players[0], ('village', 0))
+    board.players[3].hand = np.array(board.structure.real_estate_cost[1])
+    board.execute_player_action(board.players[0], ('village', 20))
+    board.players[3].hand = np.array(board.structure.real_estate_cost[2])
+    board.execute_player_action(board.players[0], ('town', 20))
+    board.players[0].hand = np.array(board.structure.real_estate_cost[0])
+    board.players[1].hand = np.array(board.structure.real_estate_cost[0]) + np.array([0,0,0,0,0,1])  # Add a resource to player 1's hand
+    board.players[2].hand = np.array([10,0,0,0,0,0])
+    board.players[3].hand = np.array(board.structure.real_estate_cost[2]) + np.array(board.structure.real_estate_cost[1])
+    board._update_board_for_players()
+    for player in board.players:
+        player.update_build_options()
+    vctr = BoardVector(board, include_values=True) 
+    vctr_2 = BoardVector(board, include_values=False)
+    vctr_2.add_values_to_vector(Player_Value_Function_Based)
+    assert np.all(vctr.vector == vctr_2.vector), "Vectors are not equal after adding values."

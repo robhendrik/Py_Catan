@@ -10,6 +10,8 @@ from Py_Catan.Preferences import PlayerPreferences
 from Py_Catan.Player import Player
 from Py_Catan.Board import Board
 from Py_Catan.PlayerValueFunctionBased import Player_Value_Function_Based
+from Py_Catan.ReferenceBoards import create_reference_board_1
+import Py_Catan.Player_Preference_Types as pppt
 
 def test_generic_board_numbers():
     b = Board()
@@ -204,3 +206,51 @@ def test_create_and_retrieve_board_status():
     assert sum(brd2.players[0].towns) == 1
     assert brd2.players[0].preference.hand_for_street == 0
     assert brd2.players[3].preference.hand_for_street == 10
+
+
+def test_recreate_board():
+    old_board = create_reference_board_1()
+    old_board.inform_players_of_the_board_and_position()
+    old_values = np.array([p.value_function.value_for_player(p) for p in old_board.players])
+    #
+    new_board = old_board.recreate()
+    #
+    new_player = Player_Value_Function_Based(name = 'optimized_1+',structure=old_board.structure,preference=pppt.optimized_1_with_0_for_full_score)
+    new_player.copy_position_from_other_player(old_board.players[0])
+    new_board.players[0] = new_player
+  
+    new_player = Player_Value_Function_Based(name = 'optimized_2+',structure=old_board.structure,preference=pppt.optimized_1)
+    new_player.copy_position_from_other_player(old_board.players[1])
+    new_board.players[1] = new_player
+
+    new_player = Player_Value_Function_Based(name = 'optimized_3+',structure=old_board.structure,preference=pppt.optimized_2)
+    new_player.copy_position_from_other_player(old_board.players[2])
+    new_board.players[2] = new_player
+  
+    new_player = Player_Value_Function_Based(name = 'optimized_4+',structure=old_board.structure,preference=pppt.optimized_1)
+    new_player.copy_position_from_other_player(old_board.players[3])
+    new_board.players[3] = new_player
+ 
+    new_board.inform_players_of_the_board_and_position()
+    new_board.sync_status_between_board_and_players()
+    assert np.all(old_board.occupied_edges == new_board.occupied_edges), "Occupied edges do not match"
+    assert np.all(old_board.occupied_nodes == new_board.occupied_nodes), "Occupied nodes do not match"
+
+    for old_player, new_player in zip(old_board.players, new_board.players):
+        assert type(old_player) == type(new_player), "Player types do not match"
+        assert old_player.preference == new_player.preference, "Preferences do not match"
+        assert old_player.owns_longest_street == new_player.owns_longest_street, "Ownership of longest street does not match"
+        assert old_player.longest_street_for_this_player == new_player.longest_street_for_this_player, "Longest street for player does not match"
+        assert np.array_equal(old_player.hand, new_player.hand), "Hands do not match"
+        assert np.array_equal(old_player.streets, new_player.streets), "Streets do not match"
+        assert np.array_equal(old_player.towns, new_player.towns), "Towns do not match"
+        assert np.array_equal(old_player.villages, new_player.villages), "Villages do not match"
+        assert old_player._player_position == new_player._player_position, "Player positions do not match"     
+        assert np.array_equal(old_player.build_options['street_options'],new_player.build_options['street_options']), "Build options do not match"
+        assert np.array_equal(old_player.build_options['village_options'],new_player.build_options['village_options']), "Build options do not match"
+        assert np.array_equal(old_player.build_options['secondary_village_options'],new_player.build_options['secondary_village_options']), "Build options do not match"
+        assert np.array_equal(old_player.free_edges_on_board, new_player.free_edges_on_board), "Free edges on board do not match"
+        assert np.array_equal(old_player.free_nodes_on_board, new_player.free_nodes_on_board), "Free nodes on board do not match"
+
+    new_values = np.array([p.value_function.value_for_player(p) for p in old_board.players])
+    assert np.array_equal(old_values, new_values), "Values do not match after recreation"

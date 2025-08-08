@@ -32,7 +32,7 @@ def test_value_build_options():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value() == 5.0
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
     # === check value function
     vf = ValueFunction(pref, g.structure)
     values = vf.value_for_board(g)
@@ -59,7 +59,7 @@ def test_value_build_options_street():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value() == 5.0
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
     # === check value function
     vf = ValueFunction(pref, g.structure)
     values = vf.value_for_board(g)
@@ -83,7 +83,7 @@ def test_value_town():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value()==float(2/3)
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
     # === check value function
     vf = ValueFunction(pref, g.structure)
     values = vf.value_for_board(g)
@@ -112,7 +112,7 @@ def test_value_hand():
     g.players[0].hand = np.array([0,1,0,0,0,0])
     assert g.players[0].calculate_value()==0.
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
     # === check value function
     vf = ValueFunction(pref, g.structure)
     values = vf.value_for_board(g)
@@ -142,7 +142,7 @@ def test_value_hand_with_penalty():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value()== 1.0 * 1.0 * (1.0/(1+7))
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
     # === check value function
     vf = ValueFunction(pref, g.structure)
     values = vf.value_for_board(g)

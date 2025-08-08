@@ -6,37 +6,6 @@ from Py_Catan.Preferences import PlayerPreferences
 from Py_Catan.Player import Player
 
 class Board:
-    """
-    Board class for managing the state and logic of a Catan-like game board.
-
-    Attributes:
-        structure (BoardStructure): The structure of the board, defining nodes and edges.
-        occupied_nodes (np.ndarray): An array indicating which nodes are occupied.
-        occupied_edges (np.ndarray): An array indicating which edges are occupied.
-        players (list): A list of Player objects representing the players in the game.
-        free_nodes_on_board (np.ndarray): An array indicating which nodes are free on the board.
-        free_edges_on_board (np.ndarray): An array indicating which edges are free on the board.
-    Methods:
-        free_nodes(self) -> np.ndarray:
-            # Return the free nodes on the board. A node is free if it and its neighbors are unoccupied.
-        free_edges(self) -> np.ndarray:
-            # Return the free edges on the board. An edge is free if it is not occupied.
-        build_street(self, player, edge) -> None:
-            # Build a street for a player on a specified edge, update board and player state.
-        build_village(self, player, node) -> None:
-            # Build a village for a player on a specified node, update board and player state.
-        build_town(self, player, node) -> None:
-            # Upgrade a village to a town for a player at a specified node.
-        _update_board_for_players(self) -> None:
-            # Update board state for all players, including free nodes/edges and longest street.
-        propose_and_execute_trade(self, player, card_out_in) -> bool:
-            # Propose a trade to other players and execute if accepted.
-        throw_dice(self, enforce: int = -1) -> int:
-            # Simulate a dice throw, distribute resources, and handle special dice values.
-        create_board_status(self) -> dict:
-            # Create a serializable status of the board for saving the game state.
-    """
-    
     def __init__(self,
                  structure: BoardStructure = BoardStructure(),
                  players: list = [],
@@ -66,6 +35,27 @@ class Board:
         self.free_edges_on_board = self.free_edges()
         self._print_player_action = False  # Set to True to print player actions for debugging
 
+    def recreate(self) -> 'Board':
+        '''
+        Recreate the board as a new instance with the same structure and players position.
+        The players are of the base class.
+        This is useful for creating a copy of the board without modifying the original instance.
+        '''
+        new_board = Board(structure=self.structure)
+        new_board.occupied_nodes = self.occupied_nodes.copy()
+        new_board.occupied_edges = self.occupied_edges.copy()
+        new_board.players = [Player(name=p.name, preference=p.preference, structure=self.structure) for p in self.players]
+        for new_p, old_p in zip(new_board.players, self.players):
+            new_p.hand = old_p.hand.copy()
+            new_p.villages = old_p.villages.copy()
+            new_p.towns = old_p.towns.copy()
+            new_p.streets = old_p.streets.copy()
+            new_p.longest_street_for_this_player = old_p.longest_street_for_this_player
+            new_p.owns_longest_street = old_p.owns_longest_street
+            new_p._board = new_board
+            new_p._players_in_this_game = new_board.players
+        return new_board
+
     def free_nodes(self) -> np.ndarray  :
         '''
         Return the free nodes on the board.
@@ -83,42 +73,34 @@ class Board:
 
     def build_street(self,player,edge) ->  None:
         '''
-        Build a street on the board.
-        The edge must be free and the player must have a village or town on one of the
-        nodes connected to the edge.
-        The edge is marked as occupied and the player's street count is updated.
-        The longest street on the board is updated for all players.
+        Build a street on the board for player.
+        Update longest street for that player.
+        Update occupied edges on the board.
+        Update the board for all players, including determining who owns the longest street.
         '''
-        self.occupied_edges[edge] = 1
+        
+        player._longest_street_has_been_updated = False  # Reset the longest street update flag
         player.build_street(edge)
-        # update longest street for all players if the new street creates a longer street
-        if player.longest_street_for_this_player > player.longest_street_on_board:
-            for p in self.players:
-                p.longest_street_on_board = player.longest_street_for_this_player
-            player.owns_longest_street = True
-        elif player.longest_street_for_this_player == player.longest_street_on_board and player.owns_longest_street== False:
-            for p in self.players:
-                p.owns_longest_street = False
-        # update edges for all players
-        self.free_edges_on_board = self.free_edges()
-        for p in self.players:
-            p.free_edges_on_board = self.free_edges_on_board
+        if not player._longest_street_has_been_updated:
+            player.calculate_longest_street()   # Calculate longest street if not already done
+        self.occupied_edges[edge] = 1
+        # _update_board_for_players takes player.longest_street_for_this_player into account, 
+        # but does not recalculate it. We recalculate in the player instance when calling player.build_street.
+        self._update_board_for_players()
+        # Updating longest street across all players is done in _update_board_for_players.
         return 
 
     def build_village(self,player,node) -> None:
         ''' 
         Build a village on the board.
-        The node must be free and the player must have a street on one of the edges 
-        connected to the node.
+        Update occupied nodes on the board
         The node is marked as occupied and the player's village count is updated.
         The player's hand is updated with the resources used to build the village.
         The free nodes on the board are updated.    
         '''
         player.build_village(node)
         self.occupied_nodes[node] = 1
-        self.free_nodes_on_board = self.free_nodes()
-        for p in self.players:
-            p.free_nodes_on_board = self.free_nodes_on_board
+        self._update_board_for_players()
         return 
 
     def build_town(self,player,node) -> None:
@@ -128,6 +110,7 @@ class Board:
         The player's hand is updated with the resources used to build the town.
         '''
         player.build_town(node)
+        # self._update_board_for_players() should not make a difference since town location is already occupied by a village
         return 
     
     def trade_with_bank(self, player, card_out_in) -> bool:
@@ -161,7 +144,7 @@ class Board:
             new_player_order = [self.players[specified_trading_partner]]
         else:
             shift = self.players.index(player)
-            new_player_order = np.roll(self.players, shift = shift)
+            new_player_order = np.roll(self.players, shift = -1*shift)
         for q in new_player_order:
             if q == player or q.hand[card_out_in[1]] <= 0:
                 continue
@@ -171,6 +154,24 @@ class Board:
                 q.trade_with_player(card_out_in=(card_out_in[1],card_out_in[0]))
                 return True
         return False
+    
+    def enforce_and_execute_trade(self, player, card_out_in, specified_trading_partner: int = None) -> None:
+        ''' 
+        Trade is always executed either with next player or with specified trading partner. Potentially
+        partner ends up with negative resources! This is for simulation purposes only.
+        '''
+        if specified_trading_partner is not None:
+            new_player_order = [self.players[specified_trading_partner]]
+        else:
+            shift = self.players.index(player)
+            new_player_order = np.roll(self.players, shift = -1*shift)
+        enforced_trading_partner = new_player_order[1]
+        
+       
+        player.trade_with_player(card_out_in=(card_out_in[0],card_out_in[1]))
+        enforced_trading_partner.trade_with_player(card_out_in=(card_out_in[1],card_out_in[0]))
+        return
+    
     
 
 
@@ -237,6 +238,14 @@ class Board:
         Returns:
             np.array: A numpy array representing the board.
         '''
+        # Update the board for players before creating the vector
+        # This ensures that the players' free edges and nodes are up to date.
+        # Especially for value function and models this can be important.
+        self._update_board_for_players()
+        for p in self.players:
+            p.update_build_options()
+        # We can add the vectors for players, since they cannot occupy the same node or edges and have hands and values in different indices.
+        # If we ever include game related entries, we have to be careful in teh addition.
         vector = np.zeros(len(self.structure.header), np.float32)
         for position,player in enumerate(self.players):
             vector += player.create_vector_for_player(position=position, 
@@ -258,22 +267,59 @@ class Board:
         This method updates the free edges and nodes on the board for each player, 
         as well as the longest street on the board.
         '''
+        self.free_nodes_on_board = self.free_nodes()
+        self.free_edges_on_board = self.free_edges()
+        longest_streets = [p.longest_street_for_this_player for p in self.players]
+        # m is the longest street length, but never smaller than 3 (the start value)
+        m = max(max(longest_streets),self.structure.longest_street_minimum)
         for p in self.players:
-            p.free_edges_on_board = self.free_edges()
-            p.free_nodes_on_board = self.free_nodes()
-            if hasattr(p, 'board'):
-                p.board = self
-                p.player_position = self.players.index(p)
-        m = max([p.longest_street_for_this_player for p in self.players])
-        for p in self.players:
+            p.free_edges_on_board = self.free_edges_on_board
+            p.free_nodes_on_board = self.free_nodes_on_board
             p.longest_street_on_board = m
+            if p.longest_street_for_this_player == m and longest_streets.count(m) == 1:
+                p.owns_longest_street = True
+            else:
+                p.owns_longest_street = False
+            # === We ask to call inform_players_of_the_board_and_position() in the game class,
+            # but we can also call it here to ensure that the players have the correct board and position.
+            p._board = self
+            p._players_in_this_game = self.players
+            p._player_position = self.players.index(p)
+            # ----------------------
+        return
+    
+    def inform_players_of_the_board_and_position(self):
+        for p in self.players:
+            p._board = self
+            p._players_in_this_game = self.players
+            p._player_position = self.players.index(p)
+        return
+
+    def sync_status_between_board_and_players(self):
+        """
+        Update build options for all players. 
+        Executes board._update_board_for_players() and player.update_build_options() for each player.
+        
+        After this function:
+        - Fee nodes and edges on the board are updated (recalculated from occupied nodes and edges).
+        - Each player has their free nodes and edges updated by copying value from the board.
+        - Each player has their build options updated based on the current state of the board.
+        - The longest street on the board is determined and set (with minimum from structure) in player.longest_street_on_board.
+        - The flag 'player.owns_longest_street' is set to True if the player has the longest street and larger than minimum,
+          otherwise it is set to False.
+        - Also includes the function in inform_players_of_the_board_and_position() to ensure that players have the correct board and position.
+        """
+        self._update_board_for_players()
+        for p in self.players:
+            p.update_build_options()
         return
     
     def execute_player_action(self,
                                player, 
                                best_action: tuple = (None,None), 
                                rejected_trades_for_this_round: set = set([]),
-                               rejected_trades_for_this_round_for_specific_player: set = set([])
+                               rejected_trades_for_this_round_for_specific_player: set = set([]),
+                               enforce_trade: bool = False
                                ) -> None:
         '''
         Execute the best action for the player.
@@ -298,21 +344,36 @@ class Board:
         elif best_action[0] == 'town':
             self.build_town(player=player,node = best_action[1])
         elif best_action[0] == 'trade_player':
-            response = self.propose_and_execute_trade(player = player, card_out_in = best_action[1])
-            if response == False:
-                rejected_trades_for_this_round.add(best_action[1])
-                if self._print_player_action == True:
-                    print(f"Trade {best_action[1]} rejected for player {player.name}.")
+            if not enforce_trade:
+                response = self.propose_and_execute_trade(player = player, card_out_in = best_action[1])
+                if response == False:
+                    rejected_trades_for_this_round.add(best_action[1])
+                    if self._print_player_action == True:
+                        print(f"Trade {best_action[1]} rejected for player {player.name}.")
+            else:
+                self.enforce_and_execute_trade(player = player, card_out_in = best_action[1])
+   
         elif best_action[0] == 'trade_specific_player':
-            response = self.propose_and_execute_trade(player = player, 
-                                           card_out_in = best_action[1][0], 
-                                           specified_trading_partner = best_action[1][1])
-            if response == False:
-                rejected_trades_for_this_round_for_specific_player.add(best_action[1])
-                if self._print_player_action == True:
-                    print(f"Trade {best_action[1]} rejected for player {player.name}.")
+            if not enforce_trade:
+                response = self.propose_and_execute_trade(player = player, 
+                                            card_out_in = best_action[1][0], 
+                                            specified_trading_partner = best_action[1][1])
+                if response == False:
+                    rejected_trades_for_this_round_for_specific_player.add(best_action[1])
+                    if self._print_player_action == True:
+                        print(f"Trade {best_action[1]} rejected for player {player.name}.")
+            else:
+                self.enforce_and_execute_trade(player = player, 
+                                            card_out_in = best_action[1][0], 
+                                            specified_trading_partner = best_action[1][1])
         elif best_action[0] == 'trade_bank':
             self.trade_with_bank(player = player, card_out_in = best_action[1])
-        else:
+        elif best_action == (None, None):
             pass
+        else:
+            raise ValueError(f"Unknown action type: {best_action[0]}")
+        
+        self._update_board_for_players()
+        for p in self.players:
+            p.update_build_options()
         return

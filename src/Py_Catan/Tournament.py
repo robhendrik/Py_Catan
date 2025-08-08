@@ -102,25 +102,26 @@ class Tournament:
             self.game_records = dict([])
 
         for game_number in range(self.no_games_in_tournament):
+            # === change order for every game to avoid same player always goes first
             players_for_this_game = self._order_elements(game_number, [p.copy() for p in players],reverse = False)
             for player in players_for_this_game:
                 player._players_in_this_game = players_for_this_game
-   
+            # === play the game
             results, rounds = self.play_game(board_structure=board_structure,players=players_for_this_game)
+            # === reverse the random order to assign the points to the right player
             results_for_this_game = np.array(self._order_elements(game_number, results, reverse=True))
             rounds_for_this_game = np.array(rounds)
             points_for_this_game = np.array(self.calculate_points(results_for_this_game))
             player_names = self._order_elements(game_number, [p.name for p in players_for_this_game], reverse=True)
-
+            player_tournament_results += results_for_this_game
+            player_victory_points += points_for_this_game
+            rounds_for_this_tournament += rounds_for_this_game
+            # === print ===
             if verbose:
                 print('\nResults for this game:')
                 print('Player\tResults\tPoints\tRounds')
                 for i, p in enumerate(players_for_this_game):
                     print(f"{player_names[i]}\t{results_for_this_game[i]}\t{points_for_this_game[i]}\t{rounds_for_this_game[i]}")
-
-            player_tournament_results += results_for_this_game
-            player_victory_points += points_for_this_game
-            rounds_for_this_tournament += rounds_for_this_game
             # === Log the game records if logging is enabled ===
             if self.logging:
                 ranking = self.game_ranking(results)
@@ -189,6 +190,8 @@ class Tournament:
         brd = Board(structure = board_structure,players=players)
         brd._print_player_action = print_actions
         brd._update_board_for_players()
+        brd.inform_players_of_the_board_and_position()
+        brd.sync_status_between_board_and_players()
         # Set up the board
         round = 0
         self.setup_board(brd)

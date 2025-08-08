@@ -10,6 +10,7 @@ from Py_Catan.Preferences import PlayerPreferences
 from Py_Catan.Player import Player
 from Py_Catan.Board import Board
 from Py_Catan.PlayerValueFunctionBased import Player_Value_Function_Based
+from Py_Catan.ReferenceBoards import create_reference_board_1
 
 
 
@@ -41,7 +42,7 @@ def test_earning_power():
     p.preference.resource_type_weight = [0,0,0,0,0,1]
     p.update_build_options()
     assert p.calculate_value() == 12
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
   
 
 def test_player_calculate_value_villages():
@@ -54,7 +55,7 @@ def test_player_calculate_value_villages():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value()==float(1/3)
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
 
 
 def test_player_calculate_value_build_options():
@@ -74,7 +75,7 @@ def test_player_calculate_value_build_options():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value() == 5.0
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
 
 def test_player_calculate_value_build_options_street():
     g = Board()
@@ -89,7 +90,7 @@ def test_player_calculate_value_build_options_street():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value() == 5.0
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
     
 def test_player_calculate_value_town():
     g = Board()
@@ -101,7 +102,7 @@ def test_player_calculate_value_town():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value()==float(2/3)
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
 
 def test_player_calculate_value_hand():
     g = Board()
@@ -118,7 +119,7 @@ def test_player_calculate_value_hand():
     g.players[0].hand = np.array([0,1,0,0,0,0])
     assert g.players[0].calculate_value()==0.
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
 
 def test_player_calculate_value_hand_with_penalty():
     g = Board()
@@ -137,7 +138,7 @@ def test_player_calculate_value_hand_with_penalty():
     g.players[0].update_build_options()
     assert g.players[0].calculate_value()== 1.0 * 1.0 * (1.0/(1+7))
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
 
 def test_player_preference_normalization_2():
     g = Board()
@@ -156,7 +157,7 @@ def test_player_preference_normalization_2():
     g.players[0].hand = np.array([1,1,1,0,0,0])
     assert g.players[0].calculate_value()==0.4*0.25
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
 
 def test_player_preference_normalization():
     g = Board()
@@ -202,13 +203,13 @@ def test_earning_power_direct_options():
     g.players[0].update_build_options()
     assert (g.players[0].calculate_value()==6) # can build twice on tile with 'S'
     p = g.players[0]
-    assert p.calculate_value() == p.calculate_value(updated_version=True)
+    assert p.calculate_value() == p.calculate_value()
 
 def test_player_build_explore():
     brd = Board()
     p = Player_Value_Function_Based()
     brd.players[0] = p
-
+    assert True
     brd.build_village(p,2)
     brd._update_board_for_players()
     brd.players[0].update_build_options()
@@ -393,3 +394,52 @@ def test_trading_with_bank():
             player.hand[card_out_in[1]] += 1
     assert p.hand[0] == 2 and p.hand[5] == 1
     assert q.hand[0] == 1 and q.hand[5] == 2
+
+
+def test_predict_value_impact_on_recreated_board():
+    for _ in range(10):
+        for pos in range(4):
+            old_board = create_reference_board_1()
+            old_board.inform_players_of_the_board_and_position()
+            #
+            p = old_board.players[pos]
+            options = p.generate_list_of_possible_actions()
+            best_action = options[pos]
+            #
+            new_board = old_board.recreate()
+            new_player = p.copy()
+            new_board.players[pos] = new_player
+            new_board.inform_players_of_the_board_and_position()
+            new_board.sync_status_between_board_and_players()
+            new_board.execute_player_action(new_player, best_action)
+            new_value = new_player.calculate_value()
+            #
+            old_board.execute_player_action(p, best_action)
+            old_value = p.calculate_value()
+            #
+            assert np.isclose(new_value,old_value), "Values do not match after action execution"
+
+
+def test_generate_values_for_options_equal_to_executed_action():
+    """ generate options, calculate values, select option, execute action, check if value matches  """
+    np.set_printoptions(precision=4)
+    for _ in range(10):
+        for pos in [0,1,2,3]:
+            old_board = create_reference_board_1()
+            player = old_board.players[pos]
+            old_board.inform_players_of_the_board_and_position()
+            old_board.sync_status_between_board_and_players()
+            #
+            options = player.generate_list_of_possible_actions()
+            rand_index = np.random.randint(0, len(options))
+            action = options[rand_index]
+            #
+            values_1 = player.generate_values_for_options(options)
+            expected_value = values_1[rand_index][pos]
+            #        
+            old_board.execute_player_action(player, action, enforce_trade=True)
+            old_board.inform_players_of_the_board_and_position()
+            old_board.sync_status_between_board_and_players()
+            real_new_value = player.calculate_value()
+            #
+            assert np.isclose(expected_value, real_new_value), f"Expected value {expected_value} does not match real new value {real_new_value} for action {action} at position {pos}"

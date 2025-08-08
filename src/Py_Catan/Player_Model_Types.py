@@ -8,34 +8,65 @@ import pandas as pd
 import numpy as np
 import sys  
 import os
+import warnings
 sys.path.append("../src")
 
 class PlayerModelTypes:
     """
     Class to handle different player model types.
     """
-    PATH_TO_DEFAULT_MODEL = files('Py_Catan.data').joinpath("test_model_with_jul_27_dataset.keras")
+    # Path for data files belonging to source code
+    DEFAULT_PATH = 'Py_Catan.data'
 
+    # Standard test set used for correlation in all child classes
+    DEFAULT_TEST_DATA_FILE = files(DEFAULT_PATH).joinpath('data_for_model_trained_on_limited_tournament_test.csv')
+
+    # Default mode, usually overwritten in child classes
+    PATH_TO_DEFAULT_MODEL = files(DEFAULT_PATH).joinpath('model_trained_on_limited_tournament_data.keras')
+
+    # Data that can be used for training, including a test file generated in same way as the training data.
+    DEFAULT_TRAINING_DATA = [files('Py_Catan.data').joinpath(f'tournament_data_with_random_{identifier}.csv') for identifier in ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']]
+    DEFAULT_TRAINING_DATA_TEST_SET = files(DEFAULT_PATH).joinpath('tournament_data_with_random_test.csv')
     def __init__(self, model_file_name: str = ''):
         '''
         Model has to be stored as Keras file in directory Py_Catan.data
+
+        Args:
+        - model_file_name (str): Name of the Keras model file to load. If empty, uses the default model.
         '''
-        # this data is randomly sampled from tournaments with random players and function based players
-        self.path_to_sample_data = files('Py_Catan.data').joinpath('sampled_training_data.csv')
         self.header = BoardVector().header()
         self.indices = BoardVector().indices
-        if model_file_name == '':
-            self.reset_model_to_new()
-        else:
-            path_to_keras_model = files('Py_Catan.data').joinpath(model_file_name)
-            if not path_to_keras_model.exists():
-                raise FileNotFoundError(f"Model file {model_file_name} not found in Py_Catan.data directory.")
-            self.load_model_from_file(path_to_keras_model)
-        self.model.compile(optimizer='adam', loss='mean_squared_error')
-        if not self.path_to_sample_data.exists():
-            raise FileNotFoundError(f"Sample data file not found in Py_Catan.data directory.")
-        self.data_for_test_and_correlation = pd.read_csv(self.path_to_sample_data, header=0)
 
+        # === Model ===
+        if model_file_name == '':
+            # === Try loading the default model ===
+            self.path_to_keras_model = files(self.DEFAULT_PATH).joinpath(self.PATH_TO_DEFAULT_MODEL)   
+            if self.path_to_keras_model.exists():
+                self.load_model_from_file(self.path_to_keras_model)
+                self.model.compile(optimizer='adam', loss='mean_squared_error')
+            else:
+                # If the default model file does not exist, create a new blank model
+                # and warn the user.
+                warnings.warn("Default model file not found in Py_Catan.data directory. Will create blank model", UserWarning)
+                self.reset_model_to_new()
+                self.path_to_keras_model = ''                
+        else:
+            # === Load the specified model file ===
+            self.path_to_keras_model = files(self.DEFAULT_PATH).joinpath(model_file_name)
+            if not self.path_to_keras_model.exists():
+                raise FileNotFoundError(f"Model file {model_file_name} not found in Py_Catan.data directory. Use function "
+                                        "'load_model_from_file()' to load a model from a different path.")
+            self.load_model_from_file(self.path_to_keras_model)
+            self.model.compile(optimizer='adam', loss='mean_squared_error')
+                
+        # === Test Data ===
+        self.path_to_test_data = files(self.DEFAULT_PATH).joinpath(self.DEFAULT_TEST_DATA_FILE)
+        if not self.path_to_test_data.exists():
+            raise FileNotFoundError(f"Sample data file not found in Py_Catan.data directory.")
+        self.data_for_test_and_correlation = pd.read_csv(self.path_to_test_data, header=0)
+
+        # === Settings for ranking based on game statistics ===
+        # This is used to calculate the y values for the model based on game statistics.
         # Ranking of players based on their performance
         self.score_table_for_ranking_per_game = [10, 5, 2, 0]
         self.discount_factor = 0.95  # Discount factor for future rewards
@@ -262,9 +293,22 @@ class PlayerModelTypes:
             y.append([value_1, value_2, value_3, value_4])
         return np.array(y, dtype=np.float32)
     
+    def y_values_from_value_function_based(self, data: pd.DataFrame = None):
+        """
+        Returns the y values calculated based on a value function.
+        This is used for testing the model with a value function based player.
+        """
+        #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        #
+        #              TO
+        #
+        #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+        return
+
+    
     def create_prediction_from_model(self):
         """
-        Creates a prediction from the model using the data.
+        Creates a prediction from the model using the data in 'self.data_for_test_and_correlation'.
         """
         # === Extract inputs ===
         # input1: first edges
@@ -277,19 +321,15 @@ class PlayerModelTypes:
         # === Sample Predictions ===
         return self.model.predict([input1, input2, input3], verbose=0)
     
-
-    def plot_correlation(self) -> list:
+    def create_prediction_from_vector(self, vector: BoardVector):
         """
-        Overwrite this in inheritance
-        e.g., self._create_plot_for_correlations()
-
-        or 
-            y_test = self.y_values_from_properties()
-            y_pred = self.create_prediction_from_model()
-            self._create_plot_for_correlations(y_test, y_pred)
+        Creates a prediction from the model using a vector.
         """
-        return self._create_plot_for_correlations()
-    
+        ivctr = vector.vector
+        df = pd.DataFrame([ivctr], columns=vector.header())
+        inputs = self.generate_training_input_data_from_catan_vector_format(df)
+        return self.model.predict(inputs, verbose=0)
+
     def _create_plot_for_correlations(self, y_test: np.ndarray = None, y_pred: np.ndarray = None) -> list:
         """
         Plots the correlation between actual and predicted values.]
@@ -376,23 +416,28 @@ class PlayerModelTypes:
             points = np.array(points, dtype=np.float64)
             return points
 
-
+# ----------------------------------------------------------------------
 class model_trained_on_streets_villages_towns_b_cards(PlayerModelTypes):
-    """
-    Model trained such that value is:
-    - for first player number of streets
-    - for second player number of villages
-    - for third player number of towns
-    - for fourth player number of b_cards
-
-    Model file: test_model_with_jul_27_dataset.keras
-
-    Settings:
-        batch_size=128,
-        epochs=256,
-    """
     def __init__(self):
-        super().__init__(model_file_name="test_model_with_jul_27_dataset.keras")
+        """
+        Model used for testing, trained on specific behavior:
+        - for first player number of streets
+        - for second player number of villages
+        - for third player number of towns
+        - for fourth player number of b_cards
+
+        The test data is sample test data from tournaments between value based players. If you want to change 
+        use 'read_test_data_from_file()' to read test data from a file.
+        """
+        super().__init__(model_file_name="model_trained_on_streets_villages_towns_b_cards.keras")
+
+        # === Do not load specific test data, use default ===
+        # # === Load test data for this model ===
+        # self.path_to_test_data = files(self.DEFAULT_PATH).joinpath('data_for_model_trained_on_streets_villages_towns_b_cards_test.csv')
+        # if not self.path_to_test_data.exists():
+        #     raise FileNotFoundError(f"Sample data file not found in Py_Catan.data directory.")
+        # self.data_for_test_and_correlation = pd.read_csv(self.path_to_test_data, header=0)
+        return
         return
     
     def plot_correlation(self):
@@ -406,17 +451,25 @@ class model_trained_on_streets_villages_towns_b_cards(PlayerModelTypes):
     def y_values_from_data(self, data: pd.DataFrame = None):
         return self._y_values_from_properties(data)
 
+# ----------------------------------------------------------------------
 class model_trained_on_limited_tournament_data(PlayerModelTypes):
-    """
-    Model on data generated on July 27
-    AI_player_model_with_jul_27_dataset.keras
 
-    Settings:
-        batch_size=128,
-        epochs=256,
-    """
     def __init__(self):
-        super().__init__(model_file_name="AI_player_model_with_jul_27_dataset.keras")
+        """
+        Model on data generated on July 27 2025 from small tournament.
+
+        The test data is sample test data from tournaments between value based players. If you want to change 
+        use 'read_test_data_from_file()' to read test data from a file.
+        """
+        super().__init__(model_file_name="model_trained_on_limited_tournament_data.keras")
+
+        # === Do not load specific test data, use default ===
+        # # === Load test data for this model ===
+        # # this data is randomly sampled from tournaments with random players and function based players
+        # self.path_to_test_data = files(self.DEFAULT_PATH).joinpath('data_for_model_trained_on_limited_tournament_test.csv')
+        # if not self.path_to_test_data.exists():
+        #     raise FileNotFoundError(f"Sample data file not found in Py_Catan.data directory.")
+        # self.data_for_test_and_correlation = pd.read_csv(self.path_to_test_data, header=0)
         return
     
     def plot_correlation(self):
@@ -430,13 +483,28 @@ class model_trained_on_limited_tournament_data(PlayerModelTypes):
     def y_values_from_data(self, data: pd.DataFrame = None):
         return self._y_values_from_data_in_data_file(data)
     
+
+# ----------------------------------------------------------------------
 class blank_model(PlayerModelTypes):
-    """
-    Untrained model cloned from the default model.
-    """
+
     def __init__(self):
+        """
+        Untrained model cloned from the default model. Model has to be trained by the user:
+        - Use 'model_type.train_the_model()' to train the model with data.
+
+        After this you can plot correlations, save the model, make predictions, etc.
+
+        The test data is an empty DataFrame, so no correlations can be plotted.
+        """
         super().__init__()
+        # this is a blank model, so everything has to be filled by user
         self.reset_model_to_new()
+        self.path_to_test_data = ""
+        self.path_to_keras_model = ""
+        
+        # === Do not load specific test data, use default ===
+        self.data_for_test_and_correlation = pd.DataFrame()
+
         return
     
     def plot_correlation(self):
@@ -450,17 +518,30 @@ class blank_model(PlayerModelTypes):
     def y_values_from_data(self, data: pd.DataFrame = None):
         return self._y_values_from_data_in_data_file(data)
     
-class model_trained_on_specific_villages_and_streets(PlayerModelTypes):
-    """
-    Player one trained to build village on node 0 and street on edge 0.
-    Player two trained to build village on node 10 and street on edge 16.
-    Player three trained to build village on node 20 and street on edge 25.
-    Player four trained to build village on node 30 and street on edge 47.
 
-    """
+# ----------------------------------------------------------------------    
+class model_trained_on_specific_villages_and_streets(PlayerModelTypes):
+    
     def __init__(self):
-        super().__init__(model_file_name="trained_model_for_specific_villages_and_streets_e_256_b_128.keras")
-        return
+        """
+        Model used for testing, trained on specific behavior:
+        - Player one trained to build village on node 0 and street on edge 0.
+        - Player two trained to build village on node 10 and street on edge 16.
+        - Player three trained to build village on node 20 and street on edge 25.
+        - Player four trained to build village on node 30 and street on edge 47.
+
+        The test data is sample test data from tournaments between value based players. If you want to change 
+        use 'read_test_data_from_file()' to read test data from a file.
+        """
+        super().__init__(model_file_name="model_trained_on_specific_villages_and_streets.keras")
+
+        # === Do not load specific test data, use default ===
+        # # === Load test data for this model ===
+        # self.path_to_test_data = files('Py_Catan.data').joinpath("data_for_model_trained_on_specific_villages_and_streets_test.csv")
+        # if not self.path_to_test_data.exists():
+        #     raise FileNotFoundError(f"Test data file not found in Py_Catan.data directory.")
+        # self.data_for_test_and_correlation = pd.read_csv(self.path_to_test_data, header=0)
+        # return
     
     def plot_correlation(self):
         """

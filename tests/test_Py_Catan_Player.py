@@ -134,7 +134,8 @@ def test_longest_street():
         brd.build_street(p, s)
     assert p.calculate_longest_street() == 3
     assert p.longest_street_for_this_player == 3
-    assert p.owns_longest_street == False
+    brd._update_board_for_players()
+    assert p.owns_longest_street == True
     for s in [0,1,2,3,7,8,9]:
         brd.build_street(p, s)
     assert p.calculate_longest_street() == 4
@@ -153,6 +154,8 @@ def test_longest_street():
     for s in [58]:
         brd.build_street(q, s)
     assert q.calculate_longest_street() == 5
+    brd._update_board_for_players()
+    print(q.calculate_longest_street(),p.calculate_longest_street())
     assert q.longest_street_for_this_player == 5
     assert q.owns_longest_street == False
     assert p.owns_longest_street == False
